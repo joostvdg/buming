@@ -1,4 +1,86 @@
 package com.github.joostvdg.buming.concurrency.dining;
 
-public class DiningPhilosiphers {
+import com.github.joostvdg.buming.api.ConcurrencyExample;
+import com.github.joostvdg.buming.logging.Logger;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+class DiningPhilosopher implements Callable<Integer>{
+
+    private final Philosopher philosopher;
+
+    DiningPhilosopher(Philosopher philosopher) {
+        this.philosopher = philosopher;
+    }
+
+    @Override
+    public String toString(){
+        return "[" + philosopher.getName() + "] ate " + philosopher.timesEaten() + " times and thought " + philosopher.timesThought() + " times";
+    }
+
+    @Override
+    public Integer call() throws Exception {
+        philosopher.think();
+        philosopher.eat();
+        philosopher.think();
+        philosopher.eat();
+        philosopher.think();
+        philosopher.eat();
+        philosopher.eat();
+        return philosopher.timesEaten();
+    }
+}
+
+public class DiningPhilosophers implements ConcurrencyExample {
+    @Override
+    public String name() {
+        return this.getClass().getSimpleName();
+    }
+
+    @Override
+    public void start(Logger logger) {
+        String[] names = new String[] {"Aristotle", "Voltaire", "Laoze", "Confucius", "Nietzche" };
+        int amountOfPhilosophers = 5;
+        List<DiningPhilosopher> philosophers = new ArrayList<>();
+        List<Chopstick> chopsticks = new ArrayList<>();
+        Chopstick firstChopstick = null;
+        Chopstick previousChopstick = null;
+        chopsticks.add(firstChopstick);
+        for (int i = 0; i < amountOfPhilosophers; i++) {
+            if (firstChopstick == null) {
+                firstChopstick = new Chopstick();
+            }
+            if (previousChopstick == null) {
+                previousChopstick = firstChopstick;
+            }
+            Chopstick rightChopstick = new Chopstick();
+            if (i + 1 == amountOfPhilosophers) {
+                rightChopstick = firstChopstick;
+            } else {
+                chopsticks.add(rightChopstick);
+            }
+
+            Philosopher philosopher = new Philosopher(names[i], previousChopstick, rightChopstick);
+            DiningPhilosopher diningPhilosopher = new DiningPhilosopher(philosopher);
+            philosophers.add(diningPhilosopher);
+            previousChopstick = rightChopstick;
+        }
+
+        System.out.println("[" + getClass().getSimpleName() + "] Chopsticks: " + chopsticks.size() + ", dining philosophers: " + philosophers.size() );
+        ExecutorService executorService = Executors.newFixedThreadPool(amountOfPhilosophers);
+        try {
+            executorService.invokeAll(philosophers);
+            executorService.awaitTermination(10000, TimeUnit.MILLISECONDS);
+            philosophers.forEach(System.out::println);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+
+    }
 }
