@@ -46,32 +46,21 @@ public class DiningPhilosophers implements ConcurrencyExample {
     public void start(Logger logger) {
         String[] names = new String[] {"Aristotle", "Voltaire", "Laoze", "Confucius", "Nietzche" };
         int amountOfPhilosophers = 5;
-        List<DiningPhilosopher> philosophers = new ArrayList<>();
-        List<Chopstick> chopsticks = new ArrayList<>();
-        Chopstick firstChopstick = null;
-        Chopstick previousChopstick = null;
-        chopsticks.add(firstChopstick);
-        for (int i = 0; i < amountOfPhilosophers; i++) {
-            if (firstChopstick == null) {
-                firstChopstick = new Chopstick();
-            }
-            if (previousChopstick == null) {
-                previousChopstick = firstChopstick;
-            }
-            Chopstick rightChopstick = new Chopstick();
-            if (i + 1 == amountOfPhilosophers) {
-                rightChopstick = firstChopstick;
-            } else {
-                chopsticks.add(rightChopstick);
-            }
 
-            Philosopher philosopher = new Philosopher(names[i], previousChopstick, rightChopstick);
-            DiningPhilosopher diningPhilosopher = new DiningPhilosopher(philosopher);
-            philosophers.add(diningPhilosopher);
-            previousChopstick = rightChopstick;
+        List<DiningPhilosopher> philosophers = new ArrayList<>();
+        Chopstick[] chopsticks = new Chopstick[amountOfPhilosophers];
+        for(int i=0; i < amountOfPhilosophers; i++) {
+            chopsticks[i] = new Chopstick();
         }
 
-        System.out.println("[" + getClass().getSimpleName() + "] Chopsticks: " + chopsticks.size() + ", dining philosophers: " + philosophers.size() );
+        for(int i=0; i < amountOfPhilosophers; i++) {
+            Chopstick leftChopstick = chopsticks[i];
+            Chopstick rightChopstick = chopsticks[(i+1) % amountOfPhilosophers]; // this way, we will circle back to the start of the array when i == amountOfPhilosophers
+            Philosopher philosopher = new Philosopher(names[i], leftChopstick, rightChopstick);
+            philosophers.add(new DiningPhilosopher(philosopher));
+        }
+
+        System.out.println("[" + getClass().getSimpleName() + "] Chopsticks: " + chopsticks.length + ", dining philosophers: " + philosophers.size() );
         ExecutorService executorService = Executors.newFixedThreadPool(amountOfPhilosophers);
         try {
             executorService.invokeAll(philosophers);
