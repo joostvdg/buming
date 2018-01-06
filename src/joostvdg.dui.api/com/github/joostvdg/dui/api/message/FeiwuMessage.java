@@ -1,4 +1,4 @@
-package com.github.joostvdg.dui.api;
+package com.github.joostvdg.dui.api.message;
 
 public class FeiwuMessage {
     private final int messageSize;

@@ -8,6 +8,8 @@ import com.github.joostvdg.dui.server.api.DuiServerFactory;
 
 import java.util.Random;
 import java.util.ServiceLoader;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class App {
 
@@ -27,8 +29,28 @@ public class App {
         DuiServer serverSimpleB = DuiServerFactory.newServerSimple(ProtocolConstants.EXTERNAL_COMMUNICATION_PORT_B, ProtocolConstants.POTENTIAL_SERVER_NAMES[pseudoRandom2], logger);
         DuiServer serverSimpleC= DuiServerFactory.newServerSimple(ProtocolConstants.EXTERNAL_COMMUNICATION_PORT_C, ProtocolConstants.POTENTIAL_SERVER_NAMES[pseudoRandom3], logger);
 
-        serverSimpleA.startServer();
-        serverSimpleB.startServer();
-        serverSimpleC.startServer();
+        serverSimpleA.logMembership();
+        serverSimpleB.logMembership();
+        serverSimpleC.logMembership();
+
+        ExecutorService executorService = Executors.newFixedThreadPool(3);
+        executorService.submit(serverSimpleA::startServer);
+        executorService.submit(serverSimpleB::startServer);
+        executorService.submit(serverSimpleC::startServer);
+
+        for(int i = 0; i < 15; i++){
+            try {
+                Thread.sleep(5000);
+                serverSimpleA.logMembership();
+                Thread.sleep(2000);
+                serverSimpleB.logMembership();
+                if (i == 5) {
+                    serverSimpleC.stopServer();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }
     }
 }

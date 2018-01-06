@@ -1,4 +1,4 @@
-package com.github.joostvdg.dui.api;
+package com.github.joostvdg.dui.api.message;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;

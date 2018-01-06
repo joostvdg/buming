@@ -1,11 +1,15 @@
 package com.github.joostvdg.dui.server.api.impl;
 
-import com.github.joostvdg.dui.api.FeiwuMessageType;
+import com.github.joostvdg.dui.api.exception.MessageDeliveryException;
+import com.github.joostvdg.dui.api.exception.MessageTargetDoesNotExistException;
+import com.github.joostvdg.dui.api.exception.MessageTargetNotAvailableException;
+import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.client.api.DuiClient;
 import com.github.joostvdg.dui.client.api.DuiClientFactory;
 import com.github.joostvdg.dui.logging.LogLevel;
 import com.github.joostvdg.dui.logging.Logger;
 import com.github.joostvdg.dui.server.api.DuiServer;
+import com.github.joostvdg.dui.server.api.Membership;
 import com.github.joostvdg.dui.server.handler.ClientHandler;
 
 import java.io.IOException;
@@ -26,7 +30,7 @@ public class ServerSimpleImpl implements DuiServer {
 
     private final TaskGate taskGate;
 
-    private final ConcurrentHashMap<String, Integer> membershipList;
+    private final ConcurrentHashMap<Integer, Membership> membershipList;
     private final Logger logger;
     private final String name;
     private final String mainComponent;
@@ -42,8 +46,9 @@ public class ServerSimpleImpl implements DuiServer {
         taskGate = TaskGate.getTaskGate(2, logger);
         membershipList = new ConcurrentHashMap<>();
         for (int i = INTERNAL_COMMUNICATION_PORT_A; i <= INTERNAL_COMMUNICATION_PORT_C; i++) { // TODO: determine actual/current membership list
-            if (port != i) {
-                membershipList.put(""+i, i);
+            if (internalPort != i) {
+                Membership membership = new Membership(""+i, System.currentTimeMillis());
+                membershipList.put(i, membership);
             }
         }
     }
@@ -77,6 +82,29 @@ public class ServerSimpleImpl implements DuiServer {
         return name;
     }
 
+    @Override
+    public void updateMembershipList(int port, String serverName) {
+
+        if (membershipList.contains(port) && membershipList.get(port).getName().equals(serverName)) {
+            Membership existingMemberShip = membershipList.get(port);
+            existingMemberShip.updateLastSeen(System.currentTimeMillis());
+        } else {
+            Membership newMembership = new Membership(serverName, System.currentTimeMillis());
+            membershipList.put(port, newMembership);
+        }
+
+    }
+
+    @Override
+    public void logMembership() {
+        long threadId = Thread.currentThread().getId();
+        logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Listing memberships");
+        membershipList.keySet().forEach(port -> {
+           Membership membership = membershipList.get(port);
+           logger.log(LogLevel.INFO, mainComponent, "Main", threadId, "  > ", membership.toString());
+        });
+    }
+
     private void listenToExternalCommunication() {
         long threadId = Thread.currentThread().getId();
         logger.log(LogLevel.INFO, mainComponent, "External", threadId, " Started");
@@ -90,7 +118,7 @@ public class ServerSimpleImpl implements DuiServer {
                 logger.log(LogLevel.DEBUG, mainComponent, "External", threadId, " Status: ", status);
                 try  {
                     Socket clientSocket = serverSocket.accept();
-                    Runnable clientHandler = new ClientHandler(clientSocket, logger, mainComponent);
+                    Runnable clientHandler = new ClientHandler(clientSocket, logger, this);
                     taskGate.addTask(clientHandler);
                     try {
                         Thread.sleep(1);
@@ -127,7 +155,7 @@ public class ServerSimpleImpl implements DuiServer {
                 logger.log(LogLevel.DEBUG, mainComponent, "Internal", threadId, " Status: ",status);
                 try  {
                     Socket clientSocket = serverSocket.accept();
-                    Runnable clientHandler = new ClientHandler(clientSocket, logger, mainComponent);
+                    Runnable clientHandler = new ClientHandler(clientSocket, logger, this);
                     taskGate.addTask(clientHandler);
                     try {
                         Thread.sleep(1);
@@ -152,10 +180,30 @@ public class ServerSimpleImpl implements DuiServer {
     }
 
 
-    private void talkToOtherServers() {
+    private void sendMemberShipUpdate() {
         DuiClient client = DuiClientFactory.newSimpleClient();
+        long threadId = Thread.currentThread().getId();
         while (!stopped) {
-            membershipList.values().forEach(port -> client.sendServerMessage(FeiwuMessageType.HELLO, ("Hi from " + name).getBytes(), port));
+
+            membershipList.keySet().forEach(port -> {
+                Membership membership = membershipList.get(port);
+                long currentTime = System.currentTimeMillis();
+                if (membership.failedCheckCount() > 2 || (currentTime - membership.getLastSeen()) > 15000){
+                    membershipList.remove(port);
+                    logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Removed ", membership.toString());
+                } else {
+                    try {
+                        client.sendServerMessage(FeiwuMessageType.MEMBERSHIP, (internalPort+","+name).getBytes(), port);
+                    } catch (MessageTargetNotAvailableException e) {
+                        logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Could not contact ", membership.toString());
+                        membership.incrementFailedCheckCount();
+                    } catch (MessageDeliveryException | MessageTargetDoesNotExistException e) { // TODO: when changing to multi-host, we should do something else
+                        membership.incrementFailedCheckCount();
+                        logger.log(LogLevel.ERROR, mainComponent, "Main", threadId, e.getMessage());
+                    }
+                }
+
+            });
             try {
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
@@ -170,7 +218,14 @@ public class ServerSimpleImpl implements DuiServer {
         ExecutorService executorService = Executors.newFixedThreadPool(3);
         executorService.submit(this::listenToExternalCommunication);
         executorService.submit(this::listenToInternalCommunication);
-        executorService.submit(this::talkToOtherServers);
+
+        // Lets first wait before we start updating the membership lists
+        try {
+            Thread.sleep(2500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        executorService.submit(this::sendMemberShipUpdate);
     }
 
 }

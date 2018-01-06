@@ -3,10 +3,13 @@ package com.github.joostvdg.dui.logging.impl;
 import com.github.joostvdg.dui.logging.LogLevel;
 import com.github.joostvdg.dui.logging.Logger;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class LoggerImpl implements Logger {
+
+    private static final String ERROR_FLAG_PREFIX = "[ERROR]";
 
     private final BlockingQueue<String> logQueue;
     private final LoggerThread loggerThread;
@@ -46,16 +49,24 @@ public class LoggerImpl implements Logger {
             return;
         }
 
-        StringBuffer logBuffer = new StringBuffer("[");
+        StringBuffer logBuffer = new StringBuffer("");
+        if (level.equals(LogLevel.ERROR)) {
+            logBuffer.append("[ERROR]");
+        }
+        logBuffer.append("[");
         logBuffer.append(mainComponent);
-        if (mainComponent.length() < 15) {
-            logBuffer.append("]\t\t\t[");
+        if (mainComponent.length() < 18) {
+            logBuffer.append("]\t\t\t\t[");
         } else if (mainComponent.length() < 22) {
+            logBuffer.append("]\t\t\t[");
+        } else if (mainComponent.length() < 30) {
             logBuffer.append("]\t\t[");
         } else {
             logBuffer.append("]\t[");
         }
         logBuffer.append(level);
+        logBuffer.append("]\t[");
+        logBuffer.append(LocalDateTime.now().toLocalTime());
         logBuffer.append("]\t[");
         logBuffer.append(threadId);
         if (threadId < 10) {
@@ -108,7 +119,12 @@ public class LoggerImpl implements Logger {
                     synchronized (LoggerImpl.this) {
                         --queued; // we've taken up a message, less people queue'd for sure
                     }
-                    System.out.println(message);
+
+                    if (message.startsWith(ERROR_FLAG_PREFIX)) {
+                        System.err.println(message.substring(ERROR_FLAG_PREFIX.length()));
+                    } else {
+                        System.out.println(message);
+                    }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }

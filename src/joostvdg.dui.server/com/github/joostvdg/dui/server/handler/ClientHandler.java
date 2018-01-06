@@ -1,11 +1,12 @@
 package com.github.joostvdg.dui.server.handler;
 
 
-import com.github.joostvdg.dui.api.Feiwu;
-import com.github.joostvdg.dui.api.FeiwuMessage;
-import com.github.joostvdg.dui.api.FeiwuMessageType;
+import com.github.joostvdg.dui.api.message.Feiwu;
+import com.github.joostvdg.dui.api.message.FeiwuMessage;
+import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.logging.LogLevel;
 import com.github.joostvdg.dui.logging.Logger;
+import com.github.joostvdg.dui.server.api.DuiServer;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -18,13 +19,14 @@ public class ClientHandler implements Runnable {
     private final Socket client;
     private final Logger logger;
     private final String serverComponent;
+    private final DuiServer duiServer;
 
-    public ClientHandler(Socket client, Logger logger, String serverComponent) {
+    public ClientHandler(Socket client, Logger logger, DuiServer duiServer) {
         this.client = client;
         this.logger = logger;
-        this.serverComponent =serverComponent;
+        this.duiServer = duiServer;
+        this.serverComponent = "Server-" + duiServer.name();
     }
-
 
     /**
      * When an object implementing interface <code>Runnable</code> is used
@@ -86,6 +88,9 @@ public class ClientHandler implements Runnable {
                     in.read(messageBytes, 0, messageSize);
                     String message = new String(messageBytes);
                     FeiwuMessage feiwuMessage = new FeiwuMessage(messageSize, messageType, message);
+                    if (messageType.equals(FeiwuMessageType.MEMBERSHIP)) {
+                        handleMembership(message, duiServer);
+                    }
                     logger.log(LogLevel.INFO, serverComponent,"ClientHandler", threadId, feiwuMessage.toString());
 
                 } catch (IOException e1) {
@@ -110,6 +115,16 @@ public class ClientHandler implements Runnable {
                 }
             }
         }
+    }
+
+    private void handleMembership(String message, DuiServer duiServer) { // TODO: move this to specific message type object
+        if (!message.contains(",")) {
+            throw new IllegalArgumentException("This is not a proper Membership message");
+        }
+        String[] messageParts = message.split(",");
+        int port = Integer.parseInt(messageParts[0]);
+        String serverName = messageParts[1];
+        duiServer.updateMembershipList(port, serverName);
     }
 
     private void printByteArrayBlocks(byte[] responseBytes, int offset, int bytesToPrint) {

@@ -11,4 +11,8 @@ public interface DuiServer {
     boolean isStopped();
 
     String name();
+
+    void updateMembershipList(int port, String serverName);
+
+    void logMembership();
 }

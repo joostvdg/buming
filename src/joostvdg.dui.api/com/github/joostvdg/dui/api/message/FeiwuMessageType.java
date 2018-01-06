@@ -1,4 +1,4 @@
-package com.github.joostvdg.dui.api;
+package com.github.joostvdg.dui.api.message;
 
 public enum FeiwuMessageType {
     UNIDENTIFIED((byte)0x00),
