@@ -18,7 +18,7 @@ public class ServerImpl implements Server{
 
     @Override
     public void start(int port) throws Exception {
-        System.out.println("Starting server on port " + port);
+        System.out.println("Starting servera on port " + port);
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         UnsafeCounter unsafeCounter = new UnsafeCounter();
         SafeCounter safeCounter = new SafeCounter();
