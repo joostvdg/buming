@@ -1,6 +1,7 @@
 package com.github.joostvdg.dui.server.handler;
 
 
+import com.github.joostvdg.dui.api.ProtocolConstants;
 import com.github.joostvdg.dui.api.message.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessage;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
@@ -124,7 +125,18 @@ public class ClientHandler implements Runnable {
         String[] messageParts = message.split(",");
         int port = Integer.parseInt(messageParts[0]);
         String serverName = messageParts[1];
-        duiServer.updateMembershipList(port, serverName);
+
+//        System.out.println("ClientHandler.handleMembership:");
+//        for(int i =0; i < messageParts.length; i++) {
+//            System.out.println("MessagePart["+i+"]: " + messageParts[i]);
+//            System.out.println("Is it a membership leave notice: " + messageParts[i].equals(ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE));
+//        }
+
+        if (messageParts.length >= 3 && messageParts[2].equals(ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE)) {
+            duiServer.updateMembershipList(port, serverName, false);
+        } else {
+            duiServer.updateMembershipList(port, serverName, true);
+        }
     }
 
     private void printByteArrayBlocks(byte[] responseBytes, int offset, int bytesToPrint) {

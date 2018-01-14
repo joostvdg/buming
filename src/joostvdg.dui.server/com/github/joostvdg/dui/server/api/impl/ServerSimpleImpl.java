@@ -20,8 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.github.joostvdg.dui.api.ProtocolConstants.INTERNAL_COMMUNICATION_PORT_A;
-import static com.github.joostvdg.dui.api.ProtocolConstants.INTERNAL_COMMUNICATION_PORT_C;
+import static com.github.joostvdg.dui.api.ProtocolConstants.*;
 
 public class ServerSimpleImpl implements DuiServer {
     private volatile boolean stopped = false;
@@ -54,11 +53,14 @@ public class ServerSimpleImpl implements DuiServer {
     }
 
     @Override
-    public synchronized void stopServer(){
-        this.stopped = true;
-        long threadId = Thread.currentThread().getId();
-        logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Stopping");
-        closeServer();
+    public void stopServer(){
+        sendMembershipLeaveMessage();
+        synchronized (this) {
+            this.stopped = true;
+            long threadId = Thread.currentThread().getId();
+            logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Stopping");
+            closeServer();
+        }
     }
 
     @Override
@@ -83,16 +85,38 @@ public class ServerSimpleImpl implements DuiServer {
     }
 
     @Override
-    public void updateMembershipList(int port, String serverName) {
+    public void updateMembershipList(int port, String serverName, boolean active) {
+        long threadId = Thread.currentThread().getId();
+        logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " updateMembershipList ", port+ ",", serverName, ",active="+ active);
+        if (active) {
+            handleActiveMember(port, serverName);
+        } else {
+            handleInactiveMember(port, serverName);
+        }
+    }
 
-        if (membershipList.contains(port) && membershipList.get(port).getName().equals(serverName)) {
+    private void handleInactiveMember(int port, String serverName) {
+        long threadId = Thread.currentThread().getId();
+        if (membershipList.containsKey(port)) {
+            if (membershipList.get(port).getName().equalsIgnoreCase(serverName)) {
+                logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Removing ", serverName, " from membership because is it no longer active");
+                membershipList.remove(port);
+            } else {
+                logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Membership of '", serverName, "' not valid, because port "+port, " is claimed by '", membershipList.get(port).getName()+ "'");
+            }
+        } else {
+            logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Received invalid membership for port " + port);
+        }
+    }
+
+    private void handleActiveMember(int port, String serverName) {
+        if (membershipList.containsKey(port) && membershipList.get(port).getName().equals(serverName)) {
             Membership existingMemberShip = membershipList.get(port);
             existingMemberShip.updateLastSeen(System.currentTimeMillis());
         } else {
             Membership newMembership = new Membership(serverName, System.currentTimeMillis());
             membershipList.put(port, newMembership);
         }
-
     }
 
     @Override
@@ -179,6 +203,20 @@ public class ServerSimpleImpl implements DuiServer {
         }
     }
 
+    private void sendMembershipLeaveMessage() {
+        DuiClient client = DuiClientFactory.newSimpleClient();
+        long threadId = Thread.currentThread().getId();
+        // TODO: 1 - make this multi-cast
+        membershipList.keySet().forEach(port -> {
+            Membership membership = membershipList.get(port);
+            try {
+                String message = internalPort + MESSAGE_SEGMENT_DELIMITER + name + MESSAGE_SEGMENT_DELIMITER + MEMBERSHIP_LEAVE_MESSAGE;
+                client.sendServerMessage(FeiwuMessageType.MEMBERSHIP, message.getBytes(), port);
+            } catch (MessageTargetNotAvailableException | MessageDeliveryException | MessageTargetDoesNotExistException e) {
+                logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Could not send leave notice to ", membership.toString());
+            }
+        });
+    }
 
     private void sendMemberShipUpdate() {
         DuiClient client = DuiClientFactory.newSimpleClient();
@@ -189,11 +227,15 @@ public class ServerSimpleImpl implements DuiServer {
                 Membership membership = membershipList.get(port);
                 long currentTime = System.currentTimeMillis();
                 if (membership.failedCheckCount() > 2 || (currentTime - membership.getLastSeen()) > 15000){
+                    String reasonForRemoval = " because we haven't seen the server for 15000 milisec";
+                    if (membership.failedCheckCount() > 2) {
+                        reasonForRemoval = " because of to many failed checks";
+                    }
                     membershipList.remove(port);
-                    logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Removed ", membership.toString());
+                    logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Removed ", membership.toString(), reasonForRemoval);
                 } else {
                     try {
-                        client.sendServerMessage(FeiwuMessageType.MEMBERSHIP, (internalPort+","+name).getBytes(), port);
+                        client.sendServerMessage(FeiwuMessageType.MEMBERSHIP, (internalPort+MESSAGE_SEGMENT_DELIMITER+name).getBytes(), port);
                     } catch (MessageTargetNotAvailableException e) {
                         logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Could not contact ", membership.toString());
                         membership.incrementFailedCheckCount();

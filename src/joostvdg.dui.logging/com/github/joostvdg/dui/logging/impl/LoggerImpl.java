@@ -11,6 +11,17 @@ public class LoggerImpl implements Logger {
 
     private static final String ERROR_FLAG_PREFIX = "[ERROR]";
 
+    // FOR ANSI COLORS: https://stackoverflow.com/questions/5762491/how-to-print-color-in-console-using-system-out-println
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_BLACK = "\u001B[30m";
+    public static final String ANSI_RED = "\u001B[31m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_YELLOW = "\u001B[33m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_CYAN = "\u001B[36m";
+    public static final String ANSI_WHITE = "\u001B[37m";
+
     private final BlockingQueue<String> logQueue;
     private final LoggerThread loggerThread;
     private LogLevel level;
@@ -49,12 +60,30 @@ public class LoggerImpl implements Logger {
             return;
         }
 
+        String ANSI_COLOR_TO_USER = ANSI_WHITE;
+        switch(level) {
+            case DEBUG:
+                ANSI_COLOR_TO_USER = ANSI_WHITE;
+                break;
+            case INFO:
+                ANSI_COLOR_TO_USER = ANSI_CYAN;
+                break;
+            case WARN:
+                ANSI_COLOR_TO_USER = ANSI_YELLOW;
+                break;
+            case ERROR:
+                ANSI_COLOR_TO_USER = ANSI_RED;
+                break;
+        }
+
         StringBuffer logBuffer = new StringBuffer("");
         if (level.equals(LogLevel.ERROR)) {
             logBuffer.append("[ERROR]");
         }
         logBuffer.append("[");
+        logBuffer.append(ANSI_PURPLE);
         logBuffer.append(mainComponent);
+        logBuffer.append(ANSI_RESET);
         if (mainComponent.length() < 18) {
             logBuffer.append("]\t\t\t\t[");
         } else if (mainComponent.length() < 22) {
@@ -64,16 +93,23 @@ public class LoggerImpl implements Logger {
         } else {
             logBuffer.append("]\t[");
         }
+        logBuffer.append(ANSI_COLOR_TO_USER);
         logBuffer.append(level);
+        logBuffer.append(ANSI_RESET);
         logBuffer.append("]\t[");
+        logBuffer.append(ANSI_GREEN);
         logBuffer.append(LocalDateTime.now().toLocalTime());
+        logBuffer.append(ANSI_RESET);
         logBuffer.append("]\t[");
+        logBuffer.append(ANSI_GREEN);
         logBuffer.append(threadId);
+        logBuffer.append(ANSI_RESET);
         if (threadId < 10) {
             logBuffer.append("]\t\t");
         } else {
             logBuffer.append("]\t");
         }
+        logBuffer.append(ANSI_COLOR_TO_USER);
         if (subComponent != null ) {
             logBuffer.append("[");
             logBuffer.append(subComponent);
@@ -92,6 +128,7 @@ public class LoggerImpl implements Logger {
         for (String part : messageParts) {
             logBuffer.append(part);
         }
+        logBuffer.append(ANSI_RESET);
         try {
             logQueue.put(logBuffer.toString());
         } catch (InterruptedException e) {

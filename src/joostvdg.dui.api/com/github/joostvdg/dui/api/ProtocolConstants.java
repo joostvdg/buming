@@ -12,6 +12,9 @@ public class ProtocolConstants {
     public static final int INTERNAL_COMMUNICATION_PORT_B = 7782;
     public static final int INTERNAL_COMMUNICATION_PORT_C = 7783;
 
+    public static final String MEMBERSHIP_LEAVE_MESSAGE = "So Long and Thanks for All the Fish";
+    public static final String MESSAGE_SEGMENT_DELIMITER = ",";
+
     public static final String[] POTENTIAL_SERVER_NAMES = new String[] {
       "Tim Berners-Lee", "Kathleen Booth", "Grace Hopper",
         "Vint Cerf", "Edsger Dijkstra","Douglas Engelbart",
