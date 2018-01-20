@@ -15,7 +15,10 @@ services:
     networks:
       - dui
 
+# Overlay doesn't support multicast
+# https://github.com/docker/libnetwork/issues/552 / https://github.com/docker/libnetwork/issues/552#issuecomment-343067616
+# https://github.com/moby/moby/issues/3043
 networks:
   dui:
-    driver: overlay
+    driver: macvlan
     attachable: true
