@@ -3,6 +3,7 @@ package com.github.joostvdg.dui.client.api;
 import com.github.joostvdg.dui.api.message.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.api.ProtocolConstants;
+import com.github.joostvdg.dui.api.message.MessageOrigin;
 
 import java.io.*;
 import java.net.Socket;
@@ -36,7 +37,7 @@ public class DemoClient extends Thread {
             // out.println("[Client][" + threadId + "]" + i);
             String rawMessage = "Hello from " + clientName;
             byte[] message = rawMessage.getBytes();
-            Feiwu feiwuMessage = new Feiwu(FeiwuMessageType.HELLO, message);
+            Feiwu feiwuMessage = new Feiwu(FeiwuMessageType.HELLO, message, MessageOrigin.getCurrentOrigin(hostName));
             feiwuMessage.writeMessage(out);
             out.flush();
         } catch (IOException e) {

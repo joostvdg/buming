@@ -6,6 +6,7 @@ import com.github.joostvdg.dui.api.exception.MessageTargetNotAvailableException;
 import com.github.joostvdg.dui.api.message.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.api.ProtocolConstants;
+import com.github.joostvdg.dui.api.message.MessageOrigin;
 import com.github.joostvdg.dui.client.api.DuiClient;
 
 import java.io.*;
@@ -52,7 +53,7 @@ public class SimpleClient implements DuiClient {
         try (Socket kkSocket = new Socket(hostName, port)) {
             try (OutputStream mOutputStream = kkSocket.getOutputStream()) {
                 try (BufferedOutputStream out = new BufferedOutputStream(mOutputStream)) {
-                    Feiwu feiwuMessage = new Feiwu(type, message);
+                    Feiwu feiwuMessage = new Feiwu(type, message, MessageOrigin.getCurrentOrigin(hostName));
                     feiwuMessage.writeMessage(out);
                     out.flush();
                 }

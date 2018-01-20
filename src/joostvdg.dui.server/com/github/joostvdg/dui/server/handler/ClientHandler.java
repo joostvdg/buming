@@ -50,47 +50,11 @@ public class ClientHandler implements Runnable {
                     BufferedInputStream in = new BufferedInputStream(client.getInputStream())
                 ) {
                 logger.log(LogLevel.DEBUG,serverComponent, "ClientHandler", threadId, " Socket Established on Port: ", ""+ client.getRemoteSocketAddress());
-                long lastCheck = System.currentTimeMillis();
-                String inputLine, outputLine;
-
-                // First, read the headers
-                byte[] headerBytes = new byte[Feiwu.FIXED_HEADER_SIZE];
-                int bytesRead = 0;
                 try {
-                    bytesRead = in.read(headerBytes, 0, Feiwu.FIXED_HEADER_SIZE);
 
-                    // FEIWU CHECK HEADER
-                    if (headerBytes[0] == 8 && headerBytes[1] == 8) {
-                        logger.log(LogLevel.DEBUG, serverComponent,"ClientHandler", threadId, " Processing FEIWU message");
-                    } else {
-                        logger.log(LogLevel.WARN, serverComponent,"ClientHandler", threadId, " Invalid message, cannot process");
-                        return;
-                    }
-                    //printByteArrayBlocks(headerBytes, 0,2);
-
-                    // MESSAGETYPE HEADER
-                    byte[] messageTypeHeaderSegment = {headerBytes[2], headerBytes[3]};
-                    FeiwuMessageType messageType = Feiwu.getMessageTypeFromHeader(messageTypeHeaderSegment);
-                    //printByteArrayBlocks(headerBytes, 2,2);
-
-                    // MESSAGE SIZE HEADER
-                    byte[] messageSizeHeaderSegment = {headerBytes[4], headerBytes[5], headerBytes[6], headerBytes[7]};
-                    int messageSize = java.nio.ByteBuffer.wrap(messageSizeHeaderSegment).order(ByteOrder.BIG_ENDIAN).getInt();
-
-                    //printByteArrayBlocks(headerBytes, 4,4);
-
-                    // READ MESSAGE
-                    if (!(bytesRead == Feiwu.FIXED_HEADER_SIZE)) {
-                        System.out.println("[ClientHandler][" + threadId + "] ");
-                        logger.log(LogLevel.WARN, serverComponent,"ClientHandler", threadId, " Read incorrect amount of bytes, message corrupt");
-                        return;
-                    }
-                    byte[] messageBytes = new byte[messageSize];
-                    in.read(messageBytes, 0, messageSize);
-                    String message = new String(messageBytes);
-                    FeiwuMessage feiwuMessage = new FeiwuMessage(messageSize, messageType, message);
-                    if (messageType.equals(FeiwuMessageType.MEMBERSHIP)) {
-                        handleMembership(message, duiServer);
+                    FeiwuMessage feiwuMessage = Feiwu.fromInputStream(in);
+                    if (feiwuMessage.getType().equals(FeiwuMessageType.MEMBERSHIP)) {
+                        handleMembership(feiwuMessage.getMessage(), duiServer);
                     }
                     logger.log(LogLevel.INFO, serverComponent,"ClientHandler", threadId, feiwuMessage.toString());
 
@@ -98,10 +62,6 @@ public class ClientHandler implements Runnable {
                     logger.log(LogLevel.WARN, serverComponent,"ClientHandler", threadId, " Error while reading message: ", e1.getMessage());
                     e1.printStackTrace();
                 }
-                //while ((inputLine = in.readLine()) != null) {
-                //    System.out.println("[ClientHandler][" + threadId + "] received input: " + inputLine);
-                //}
-
             }
         } catch (IOException e) {
             logger.log(LogLevel.WARN, serverComponent,"ClientHandler", threadId, " Error while reading message: ", e.getMessage());
@@ -133,9 +93,9 @@ public class ClientHandler implements Runnable {
 //        }
 
         if (messageParts.length >= 3 && messageParts[2].equals(ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE)) {
-            duiServer.updateMembershipList(port, serverName, false);
+            duiServer.updateMembershipList("localhost", port, serverName, false);
         } else {
-            duiServer.updateMembershipList(port, serverName, true);
+            duiServer.updateMembershipList("localhost",port, serverName, true);
         }
     }
 

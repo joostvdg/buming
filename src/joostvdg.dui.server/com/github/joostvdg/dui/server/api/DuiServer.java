@@ -12,7 +12,7 @@ public interface DuiServer {
 
     String name();
 
-    void updateMembershipList(int port, String serverName, boolean active);
+    void updateMembershipList(String host, int port, String serverName, boolean active);
 
     void logMembership();
 }

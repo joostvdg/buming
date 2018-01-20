@@ -75,6 +75,7 @@ public class ServerSimpleImpl implements DuiServer {
         }
     }
 
+    @Override
     public synchronized boolean isStopped() {
         return this.stopped;
     }
@@ -85,7 +86,8 @@ public class ServerSimpleImpl implements DuiServer {
     }
 
     @Override
-    public void updateMembershipList(int port, String serverName, boolean active) {
+    public void updateMembershipList(String host, int port, String serverName, boolean active) {
+        // we ignore host, as the simple server is single host
         long threadId = Thread.currentThread().getId();
         logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " updateMembershipList ", port+ ",", serverName, ",active="+ active);
         if (active) {
@@ -132,8 +134,8 @@ public class ServerSimpleImpl implements DuiServer {
     private void listenToExternalCommunication() {
         long threadId = Thread.currentThread().getId();
         logger.log(LogLevel.INFO, mainComponent, "External", threadId, " Started");
-        try {
-            serverSocket = new ServerSocket(externalPort);
+        try(ServerSocket serverSocket = new ServerSocket(externalPort)) {
+
             while(!isStopped()) {
                 String status = "running";
                 if (isStopped()) {

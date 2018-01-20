@@ -86,7 +86,7 @@ public class LoggerImpl implements Logger {
         logBuffer.append(ANSI_RESET);
         if (mainComponent.length() < 18) {
             logBuffer.append("]\t\t\t\t[");
-        } else if (mainComponent.length() < 22) {
+        } else if (mainComponent.length() < 23) {
             logBuffer.append("]\t\t\t[");
         } else if (mainComponent.length() < 30) {
             logBuffer.append("]\t\t[");
@@ -105,7 +105,7 @@ public class LoggerImpl implements Logger {
         logBuffer.append(threadId);
         logBuffer.append(ANSI_RESET);
         if (threadId < 10) {
-            logBuffer.append("]\t\t");
+            logBuffer.append("]\t");
         } else {
             logBuffer.append("]\t");
         }
