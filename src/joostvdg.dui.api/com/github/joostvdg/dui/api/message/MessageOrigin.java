@@ -38,7 +38,7 @@ public class MessageOrigin {
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
-        return new MessageOrigin(ip, host, name);
+        return new MessageOrigin(host, ip, name);
     }
 
     public String getHost() {
