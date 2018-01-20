@@ -1,5 +1,6 @@
 package com.github.joostvdg.dui.server.api.impl;
 
+import com.github.joostvdg.dui.api.ProtocolConstants;
 import com.github.joostvdg.dui.api.message.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessage;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
@@ -30,6 +31,7 @@ public class DistributedServer implements DuiServer {
     private final int externalPort;
     private final int internalPort;
     private final String membershipGroup;
+    private final MessageOrigin messageOrigin;
 
     public DistributedServer(int listenPort, String membershipGroup, String name, Logger logger) {
         this.name = name;
@@ -42,6 +44,7 @@ public class DistributedServer implements DuiServer {
 
         socketExecutors = Executors.newFixedThreadPool(3);
         messageHandlerExecutor = Executors.newFixedThreadPool(3);
+        messageOrigin = MessageOrigin.getCurrentOrigin(name);
     }
 
     private void listenToInternalCommunication() {
@@ -54,14 +57,19 @@ public class DistributedServer implements DuiServer {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 socket.receive(packet);
                 FeiwuMessage feiwuMessage = Feiwu.fromBytes(packet.getData());
-                logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Received multicast: ", feiwuMessage.toString());
-                switch (feiwuMessage.getType()) {
-                    case MEMBERSHIP:
-                        Runnable runnable = () -> updateMemberShipList(feiwuMessage);
-                        messageHandlerExecutor.submit(runnable);
-                        break;
-                    default:
-                        logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Received multicast of unsupported type: ", feiwuMessage.toString());
+                MessageOrigin messageOrigin = feiwuMessage.getMessageOrigin();
+                if (!messageOrigin.getHost().equals(this.messageOrigin.getHost())) { // we received our own message, no need to deal with this
+
+                    logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Received multicast: ", feiwuMessage.toString());
+
+                    switch (feiwuMessage.getType()) {
+                        case MEMBERSHIP:
+                            Runnable runnable = () -> updateMemberShipList(feiwuMessage);
+                            messageHandlerExecutor.submit(runnable);
+                            break;
+                        default:
+                            logger.log(LogLevel.WARN, mainComponent, "Main", threadId, " Received multicast of unsupported type: ", feiwuMessage.toString());
+                    }
                 }
             }
             socket.leaveGroup(group);
@@ -71,19 +79,48 @@ public class DistributedServer implements DuiServer {
         }
     }
 
-    private void updateMemberShipList(FeiwuMessage feiwuMessage) {
-        // TODO: implement this
+    private void updateMemberShipList(final FeiwuMessage feiwuMessage) {
+        MessageOrigin messageOrigin = feiwuMessage.getMessageOrigin();
+        if (feiwuMessage.getMessage().equals(ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE)) {
+            membershipList.remove(messageOrigin.getHost());
+        } else {
+            if (membershipList.containsKey(messageOrigin.getHost())) {
+                updateMember(messageOrigin);
+            } else {
+                addMember(messageOrigin);
+            }
+        }
+    }
+
+    private void updateMember(MessageOrigin messageOrigin) {
+        long threadId = Thread.currentThread().getId();
+        Membership membership = membershipList.get(messageOrigin.getHost());
+        if (membership == null) {
+            logger.log(LogLevel.WARN, mainComponent, "Main", threadId, "Attempt to update member that does not exist");
+        } else {
+            long currentTime = System.currentTimeMillis();
+            membership.updateLastSeen(currentTime);
+        }
+    }
+
+    private void addMember(MessageOrigin messageOrigin) {
+        long threadId = Thread.currentThread().getId();
+        Membership membership = membershipList.get(messageOrigin.getHost());
+        if (membership != null) {
+            logger.log(LogLevel.WARN, mainComponent, "Main", threadId, "Attempt to add new member that already exists");
+        } else {
+            long currentTime = System.currentTimeMillis();
+            Membership newMembership = new Membership(messageOrigin.getName(), currentTime);
+            membershipList.put(messageOrigin.getHost(), newMembership);
+        }
     }
 
     private void sendMemberShipUpdates(){
-        long threadId = Thread.currentThread().getId();
-
         try (DatagramSocket socket = new DatagramSocket()) {
             while (!stopped) {
                 InetAddress group = InetAddress.getByName(membershipGroup);
                 String message = "Hello from " + name;
-                MessageOrigin messageOrigin = MessageOrigin.getCurrentOrigin(name);
-                Feiwu feiwu = new Feiwu(FeiwuMessageType.MEMBERSHIP, message, messageOrigin);
+                Feiwu feiwu = new Feiwu(FeiwuMessageType.MEMBERSHIP, message, this.messageOrigin);
                 byte[] buf = feiwu.writeToBuffer();
                 DatagramPacket packet = new DatagramPacket(buf, buf.length, group, internalPort);
                 socket.send(packet);
@@ -105,7 +142,7 @@ public class DistributedServer implements DuiServer {
         }
 
         long threadId = Thread.currentThread().getId();
-        logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Starting");
+        logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Starting: ", this.messageOrigin.toString());
 //        executorService.submit(this::listenToExternalCommunication);
         socketExecutors.submit(this::listenToInternalCommunication);
 

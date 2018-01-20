@@ -3,6 +3,7 @@ package com.github.joostvdg.dui.api.message;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 public class MessageOrigin {
     private final String host;
@@ -19,9 +20,9 @@ public class MessageOrigin {
         this.ip = ip;
         this.name = name;
         StringBuffer buffer = new StringBuffer();
-        buffer.append(ip);
-        buffer.append(SEPARATOR);
         buffer.append(host);
+        buffer.append(SEPARATOR);
+        buffer.append(ip);
         buffer.append(SEPARATOR);
         buffer.append(name);
         flatRepresentation = buffer.toString();
@@ -63,10 +64,10 @@ public class MessageOrigin {
     public static MessageOrigin fromFlat(final String flatRepresentation) {
         String[] split = flatRepresentation.split(SEPARATOR);
         // order = ip, host, name
-        String ip = split[0];
-        String host = split[1];
+        String host = split[0];
+        String ip = split[1];
         String name = split[2];
-        return new MessageOrigin(ip, host, name);
+        return new MessageOrigin(host, ip, name);
     }
 
     @Override
@@ -78,4 +79,20 @@ public class MessageOrigin {
             '}';
     }
 
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        MessageOrigin that = (MessageOrigin) o;
+        return Objects.equals(host, that.host) &&
+            Objects.equals(ip, that.ip) &&
+            Objects.equals(name, that.name);
+    }
+
+    @Override
+    public int hashCode() {
+
+        return Objects.hash(host, ip, name);
+    }
 }
