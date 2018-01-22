@@ -4,14 +4,17 @@ services:
   yi:
     image: dui
     build: .
+    stop_signal: SIGINT
     networks:
       - dui
   er:
     image: dui
+    stop_signal: SIGINT
     networks:
       - dui
   san:
     image: dui
+    stop_signal: SIGINT
     networks:
       - dui
 

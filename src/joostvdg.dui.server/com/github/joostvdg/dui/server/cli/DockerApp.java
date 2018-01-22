@@ -33,6 +33,23 @@ public class DockerApp {
         ExecutorService executorService = Executors.newFixedThreadPool(1);
         executorService.submit(distributedServer::startServer);
 
+        long threadId = Thread.currentThread().getId();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutdown hook called!");
+            logger.log(LogLevel.WARN, "App", "ShotdownHook", threadId, "Shutting down at request of Docker");
+            distributedServer.stopServer();
+            distributedServer.closeServer();
+            executorService.shutdown();
+            try {
+                Thread.sleep(100);
+                executorService.shutdownNow();
+                logger.stop();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }));
+
         for(int i = 0; i < 15; i++){
             try {
                 Thread.sleep(10000);
@@ -40,7 +57,7 @@ public class DockerApp {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
         }
+
     }
 }

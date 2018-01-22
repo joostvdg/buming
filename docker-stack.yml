@@ -4,6 +4,7 @@ services:
   dui:
     image: dui
     build: .
+    stop_signal: SIGINT
     networks:
       - dui
     deploy:

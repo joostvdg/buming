@@ -84,7 +84,9 @@ public class LoggerImpl implements Logger {
         logBuffer.append(ANSI_PURPLE);
         logBuffer.append(mainComponent);
         logBuffer.append(ANSI_RESET);
-        if (mainComponent.length() < 18) {
+        if (mainComponent.length() < 8) {
+            logBuffer.append("]\t\t\t\t\t\t[");
+        } else if (mainComponent.length() < 18) {
             logBuffer.append("]\t\t\t\t[");
         } else if (mainComponent.length() < 23) {
             logBuffer.append("]\t\t\t[");

@@ -120,3 +120,49 @@ docker network create -d macvlan --scope swarm --internal --config-from dui-conf
 ```bash
 ./create-docker-stack.sh
 ```
+
+## Graceful shutdown
+
+* https://docs.docker.com/engine/reference/builder/#run
+* https://docs.docker.com/engine/reference/commandline/run/
+* https://github.com/krallin/tini
+* https://github.com/Yelp/dumb-init
+* http://journal.thobe.org/2013/02/jvms-and-kill-signals.html
+
+### Run command
+
+```bash
+docker run --rm -ti --init --name dui-test dui
+```
+
+### In Dockerfile
+
+```dockerfile
+FROM debian:stable-slim
+ENV TINI_VERSION v0.16.1
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
+ENTRYPOINT ["/tini", "-v", "/usr/bin/dui/bin/dui"]
+```
+
+### Docker service/stack
+
+When using the image as a swarm service, the signal send is a SIGTERM.
+
+The JVM will just kill the application and not execute the [ShutdownHook](https://dzone.com/articles/know-jvm-series-2-shutdown).
+
+In order to get that to happen, we should specify our containers should be stopped by SIGINT (interruption) instead.
+
+```yaml
+version: "3.5"
+
+services:
+  dui:
+    image: dui
+    build: .
+    stop_signal: SIGINT
+    networks:
+      - dui
+    deploy:
+      mode: global
+```
