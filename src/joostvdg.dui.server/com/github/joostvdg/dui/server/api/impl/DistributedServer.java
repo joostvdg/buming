@@ -80,8 +80,10 @@ public class DistributedServer implements DuiServer {
     }
 
     private void updateMemberShipList(final FeiwuMessage feiwuMessage) {
+        long threadId = Thread.currentThread().getId();
         MessageOrigin messageOrigin = feiwuMessage.getMessageOrigin();
         if (feiwuMessage.getMessage().equals(ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE)) {
+            logger.log(LogLevel.WARN, mainComponent, "Main", threadId, "Received membership leave notice from ", messageOrigin.toString());
             membershipList.remove(messageOrigin.getHost());
         } else {
             if (membershipList.containsKey(messageOrigin.getHost())) {
@@ -161,6 +163,20 @@ public class DistributedServer implements DuiServer {
             this.stopped = true;
             long threadId = Thread.currentThread().getId();
             logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Stopping");
+            sendLeaveMessage();
+        }
+    }
+
+    private void sendLeaveMessage() {
+        try (DatagramSocket socket = new DatagramSocket()) {
+            InetAddress group = InetAddress.getByName(membershipGroup);
+            String message = ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE;
+            Feiwu feiwu = new Feiwu(FeiwuMessageType.MEMBERSHIP, message, this.messageOrigin);
+            byte[] buf = feiwu.writeToBuffer();
+            DatagramPacket packet = new DatagramPacket(buf, buf.length, group, internalPort);
+            socket.send(packet);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
