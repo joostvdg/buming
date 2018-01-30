@@ -128,6 +128,10 @@ docker network create -d macvlan --scope swarm --internal --config-from dui-conf
 * https://github.com/krallin/tini
 * https://github.com/Yelp/dumb-init
 * http://journal.thobe.org/2013/02/jvms-and-kill-signals.html
+* https://docs.oracle.com/javase/9/troubleshoot/handle-signals-and-exceptions.htm#JSTGD356
+* https://stackoverflow.com/questions/43122080/how-to-use-init-parameter-in-docker-run
+* https://stackoverflow.com/questions/32315589/what-happens-when-the-jvm-is-terminated 
+* https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 
 ### Run command
 
