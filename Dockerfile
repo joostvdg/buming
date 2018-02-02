@@ -39,4 +39,4 @@ ENV DATE_CHANGED="20180120-1525"
 RUN apt-get update && apt-get install --no-install-recommends -y psmisc=22.* && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/bin/dui-image/ /usr/bin/dui
 RUN /usr/bin/dui/bin/java --list-modules
-# ENTRYPOINT ["/usr/bin/dui/bin/dui"]
+
