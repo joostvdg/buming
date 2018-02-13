@@ -270,3 +270,18 @@ spec:
                 command: ["killall", "java" , "-INT"]
       terminationGracePeriodSeconds: 60
 ```
+
+## Plan/TODO
+
+* Send membership list to others
+    * including a sign hash?
+    * refresh signing hash every x rotations of multicast?
+* send message digest to others
+* keep a set of recent digests received
+    * sign it?
+* propagate leave messages
+    * ONLY propagate messages not yet send (check digest list)
+* Decide on a leader
+* Have a API for data entries
+* Store data entries
+* Share data entries with other nodes
