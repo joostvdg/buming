@@ -23,6 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static com.github.joostvdg.dui.api.ProtocolConstants.HEALTH_CHECK_PORT;
+
 
 public class DistributedServer implements DuiServer {
     private volatile boolean stopped = false;
@@ -54,7 +56,7 @@ public class DistributedServer implements DuiServer {
         this.logger = logger;
         membershipList = new ConcurrentHashMap<>();
 
-        socketExecutors = Executors.newFixedThreadPool(4);
+        socketExecutors = Executors.newFixedThreadPool(5);
         messageHandlerExecutor = Executors.newFixedThreadPool(3);
         messageOrigin = MessageOrigin.getCurrentOrigin(name);
     }
@@ -113,6 +115,50 @@ public class DistributedServer implements DuiServer {
             e.printStackTrace();
         } finally {
             closeServer();
+        }
+    }
+
+    private void listenToHealthCheck() {
+        long threadId = Thread.currentThread().getId();
+        logger.log(LogLevel.INFO, mainComponent, "HealthCheck", threadId, " Going to listen on port " + HEALTH_CHECK_PORT, " for healthchecks");
+        ServerSocket healthCheckSocket = null;
+        try {
+            Socket clientSocket;
+            try {
+                healthCheckSocket = new ServerSocket(HEALTH_CHECK_PORT);
+            } catch (IOException e1) {
+                throw new RuntimeException(e1.getMessage());
+            }
+            while(!isStopped()) {
+                clientSocket = healthCheckSocket.accept();
+                try (OutputStream out = clientSocket.getOutputStream()) {
+
+                    if (closed) {
+                        logger.log(LogLevel.ERROR, mainComponent, "HealthCheck", threadId, " Closed, 500");
+                        out.write("HTTP/1.0 500 Internal Server Error\r\n".getBytes());
+                    } else if (isStopped()) {
+                        logger.log(LogLevel.WARN, mainComponent, "HealthCheck", threadId, " Stopped, 503");
+                        out.write("HTTP/1.0 503 Service Unavailable\r\n".getBytes());
+                    } else {
+                        logger.log(LogLevel.INFO, mainComponent, "HealthCheck", threadId, " 200 OK");
+                        out.write("HTTP/1.1 200 OK\r\n".getBytes());
+                    }
+                    out.flush();
+                    out.close();
+                } finally {
+                    clientSocket.close();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+            if (healthCheckSocket != null && !healthCheckSocket.isClosed()) {
+                try {
+                    healthCheckSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -264,7 +310,7 @@ public class DistributedServer implements DuiServer {
 
         long threadId = Thread.currentThread().getId();
         logger.log(LogLevel.INFO, mainComponent, "Main", threadId, " Starting: ", this.messageOrigin.toString());
-//        executorService.submit(this::listenToExternalCommunication);
+        socketExecutors.submit(this::listenToHealthCheck);
         socketExecutors.submit(this::listenToInternalCommunication);
         socketExecutors.submit(this::listenToInternalGroup);
 

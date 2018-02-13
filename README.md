@@ -273,6 +273,7 @@ spec:
 
 ## Plan/TODO
 
+* healthcheck endpoint
 * Send membership list to others
     * including a sign hash?
     * refresh signing hash every x rotations of multicast?
