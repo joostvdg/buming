@@ -37,7 +37,7 @@ public class DockerApp {
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Shutdown hook called!");
-            logger.log(LogLevel.WARN, "App", "ShotdownHook", threadId, "Shutting down at request of Docker");
+            logger.log(LogLevel.WARN, "App", "ShutdownHook", threadId, "Shutting down at request of Docker");
             distributedServer.stopServer();
             distributedServer.closeServer();
             executorService.shutdown();
