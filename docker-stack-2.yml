@@ -1,0 +1,19 @@
+version: "3.5"
+
+services:
+  dui:
+    image: dui
+    build: .
+    stop_signal: SIGINT
+    networks:
+      - dui2
+      - dui-ovl
+    deploy:
+      replicas: 3
+
+
+networks:
+  dui2:
+    external: true
+  dui-ovl:
+    external: true
