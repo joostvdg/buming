@@ -1,20 +1,28 @@
 package com.github.joostvdg.dui.api.message;
 
+import java.util.Arrays;
+
 public class FeiwuMessage {
     private final int messageSize;
     private final FeiwuMessageType type;
     private final String message;
     private final MessageOrigin messageOrigin;
+    private final byte[] digest;
 
-    public FeiwuMessage(final FeiwuMessageType type, final String message, final MessageOrigin messageOrigin) {
+    public FeiwuMessage(final FeiwuMessageType type, final String message, final MessageOrigin messageOrigin, final byte[] digest) {
         this.messageSize = message.length();
         this.type = type;
         this.message = message;
         this.messageOrigin = messageOrigin;
+        this.digest = digest;
     }
 
     public int getMessageSize() {
         return messageSize;
+    }
+
+    public byte[] getDigest() {
+        return digest;
     }
 
     public FeiwuMessageType getType() {
@@ -29,13 +37,19 @@ public class FeiwuMessage {
         return this.messageOrigin;
     }
 
+    public boolean validateDigest(){
+        return Arrays.equals(Feiwu.calculateDigest(message.getBytes()), getDigest());
+    }
+
     @Override
     public String toString() {
+        boolean digestStatus = validateDigest();
         return "FeiwuMessage{" +
-            "messageSize=" + messageSize +
+            "size=" + messageSize +
             ", type=" + type +
-            ", message='" + message + '\'' +
-            ", messageOrigin=" + messageOrigin +
+            ", text='" + message + '\'' +
+            ", " + messageOrigin +
+            ", digest=" + digestStatus +
             '}';
     }
 }

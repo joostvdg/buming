@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * Simple binary protocol to play with.
@@ -19,6 +21,7 @@ import java.nio.ByteOrder;
  * 4 = MESSAGE_SIZE header
  * 5 = MESSAGE_ORIGIN data (of length MESSAGE_ORIGIN_SIZE)
  * 6 = MESSAGE data (of length MESSAGE_SIZE)
+ * 7 = MESSAGE_DIGEST (of length 32)
  */
 public final class Feiwu {
     // Feiwu header
@@ -31,17 +34,35 @@ public final class Feiwu {
 
     public static final int MESSAGE_SIZE_HEADER_SIZE = 4;
 
+    public static final int DIGEST_SIZE = 32;
+
     public static final int FIXED_HEADER_SIZE = FEIWU_HEADER.length + MESSAGE_TYPE_HEADER_SIZE + MESSAGE_SIZE_HEADER_SIZE + MESSAGE_ORIGIN_HEADER_SIZE;
 
     private final FeiwuMessageType messageType;
 
     private final byte[] message;
     private final MessageOrigin messageOrigin;
+    private final byte[] digest;
 
     public Feiwu(FeiwuMessageType messageType, byte[] message, MessageOrigin messageOrigin) {
         this.messageType = messageType;
         this.message = message;
         this.messageOrigin =messageOrigin;
+        this.digest = calculateDigest(message);
+    }
+
+    public static byte[] calculateDigest(final byte[] message){
+        MessageDigest messageDigest = null;
+        try {
+            messageDigest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        if (messageDigest != null) {
+            return messageDigest.digest(message);
+        } else {
+            throw new IllegalStateException("Could make message digest");
+        }
     }
 
     public Feiwu(FeiwuMessageType messageType, String message, MessageOrigin messageOrigin) {
@@ -79,6 +100,7 @@ public final class Feiwu {
         out.write(getMessageSize());
         out.write(messageOrigin.flat());
         out.write(message);
+        out.write(digest);
     }
 
     public byte[] writeToBuffer() {
@@ -87,7 +109,7 @@ public final class Feiwu {
         byte[] messageSize = getMessageSize();
         byte[] origin = messageOrigin.flat();
 
-        int bufferSize = FEIWU_HEADER.length + typeHeader.length + messageSize.length + originSize.length + origin.length +  message.length;
+        int bufferSize = FEIWU_HEADER.length + typeHeader.length + messageSize.length + originSize.length + origin.length +  message.length + DIGEST_SIZE;
         byte[] responseBuffer = new byte[bufferSize];
 
         int bytesCopied = 0;
@@ -96,14 +118,8 @@ public final class Feiwu {
         bytesCopied = copyMessagePartsIntoArray(originSize, responseBuffer, bytesCopied);
         bytesCopied = copyMessagePartsIntoArray(messageSize, responseBuffer, bytesCopied);
         bytesCopied = copyMessagePartsIntoArray(origin, responseBuffer, bytesCopied);
-        copyMessagePartsIntoArray(message, responseBuffer, bytesCopied);
-        // System.arraycopy(FEIWU_HEADER, 0, responseBuffer, bytesCopied, FEIWU_HEADER.length );
-//        bytesCopied += FEIWU_HEADER.length;
-//        System.arraycopy(typeHeader, 0, responseBuffer, bytesCopied, typeHeader.length);
-//        bytesCopied += typeHeader.length;
-//        System.arraycopy(messageSize, 0, responseBuffer,  bytesCopied, messageSize.length);
-//        bytesCopied += messageSize.length;
-//        System.arraycopy(message, 0, responseBuffer, bytesCopied, message.length);
+        bytesCopied = copyMessagePartsIntoArray(message, responseBuffer, bytesCopied);
+        copyMessagePartsIntoArray(digest, responseBuffer, bytesCopied);
         return responseBuffer;
     }
 
@@ -167,7 +183,11 @@ public final class Feiwu {
         in.read(messageBytes, 0, messageSize);
         String message = new String(messageBytes);
 
-        return new FeiwuMessage(messageType, message, messageOrigin);
+        // READ DIGEST
+        byte[] digest = new byte[DIGEST_SIZE];
+        in.read(digest, 0, DIGEST_SIZE);
+
+        return new FeiwuMessage(messageType, message, messageOrigin, digest);
     }
 
 }
