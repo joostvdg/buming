@@ -9,7 +9,7 @@ import com.github.joostvdg.dui.client.api.DuiClientFactory;
 import com.github.joostvdg.dui.logging.LogLevel;
 import com.github.joostvdg.dui.logging.Logger;
 import com.github.joostvdg.dui.server.api.DuiServer;
-import com.github.joostvdg.dui.server.api.Membership;
+import com.github.joostvdg.dui.api.Membership;
 import com.github.joostvdg.dui.server.handler.ClientHandler;
 
 import java.io.IOException;

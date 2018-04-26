@@ -1,10 +1,13 @@
-package com.github.joostvdg.dui.api.message;
+package com.github.joostvdg.dui.api;
+
+import com.github.joostvdg.dui.api.message.FeiwuMessage;
+import com.github.joostvdg.dui.api.message.FeiwuMessageType;
+import com.github.joostvdg.dui.api.message.MessageOrigin;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.MessageDigest;

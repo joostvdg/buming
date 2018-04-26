@@ -1,4 +1,4 @@
-package com.github.joostvdg.dui.server.api;
+package com.github.joostvdg.dui.api;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;

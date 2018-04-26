@@ -1,6 +1,6 @@
 package com.github.joostvdg.dui.client.api;
 
-import com.github.joostvdg.dui.api.message.Feiwu;
+import com.github.joostvdg.dui.api.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.api.ProtocolConstants;
 import com.github.joostvdg.dui.api.message.MessageOrigin;

@@ -1,6 +1,10 @@
 package com.github.joostvdg.dui.api.message;
 
+import com.github.joostvdg.dui.api.Feiwu;
+import com.github.joostvdg.dui.api.Membership;
+
 import java.util.Arrays;
+import java.util.List;
 
 public class FeiwuMessage {
     private final int messageSize;
@@ -8,6 +12,8 @@ public class FeiwuMessage {
     private final String message;
     private final MessageOrigin messageOrigin;
     private final byte[] digest;
+
+    private List<Membership> membershipList;
 
     public FeiwuMessage(final FeiwuMessageType type, final String message, final MessageOrigin messageOrigin, final byte[] digest) {
         this.messageSize = message.length();
@@ -39,6 +45,14 @@ public class FeiwuMessage {
 
     public boolean validateDigest(){
         return Arrays.equals(Feiwu.calculateDigest(message.getBytes()), getDigest());
+    }
+
+    public List<Membership> getMembershipList() {
+        return membershipList;
+    }
+
+    public void setMembershipList(List<Membership> membershipList) {
+        this.membershipList = membershipList;
     }
 
     @Override

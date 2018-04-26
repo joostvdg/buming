@@ -1,5 +1,7 @@
 package com.github.joostvdg.dui.api.message;
 
+import com.github.joostvdg.dui.api.Feiwu;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;

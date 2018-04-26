@@ -3,7 +3,7 @@ package com.github.joostvdg.dui.client.impl;
 import com.github.joostvdg.dui.api.exception.MessageDeliveryException;
 import com.github.joostvdg.dui.api.exception.MessageTargetDoesNotExistException;
 import com.github.joostvdg.dui.api.exception.MessageTargetNotAvailableException;
-import com.github.joostvdg.dui.api.message.Feiwu;
+import com.github.joostvdg.dui.api.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.api.ProtocolConstants;
 import com.github.joostvdg.dui.api.message.MessageOrigin;

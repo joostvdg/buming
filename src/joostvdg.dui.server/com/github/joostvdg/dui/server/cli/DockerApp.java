@@ -50,7 +50,7 @@ public class DockerApp {
             }
         }));
 
-        for(int i = 0; i < 15; i++){
+        for(int i = 0; i < 50; i++){
             try {
                 Thread.sleep(10000);
                 distributedServer.logMembership();

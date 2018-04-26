@@ -273,11 +273,12 @@ spec:
 
 ## Plan/TODO
 
-* healthcheck endpoint
-* Send membership list to others
-    * including a sign hash?
-    * refresh signing hash every x rotations of multicast?
+* CLEAN UP RECENT MESSAGES <-- check if this is done
+* health check endpoint <-- should be done?
+* Send membership list to others <-- current step
 * send message digest to others
+    * refresh signing hash every x rotations of multicast?
+* lamport timestamp ordering
 * keep a set of recent digests received
     * sign it?
 * propagate leave messages

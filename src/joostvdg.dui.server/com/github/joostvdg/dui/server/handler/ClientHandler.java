@@ -2,7 +2,7 @@ package com.github.joostvdg.dui.server.handler;
 
 
 import com.github.joostvdg.dui.api.ProtocolConstants;
-import com.github.joostvdg.dui.api.message.Feiwu;
+import com.github.joostvdg.dui.api.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessage;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.logging.LogLevel;
@@ -13,7 +13,6 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.nio.ByteOrder;
 
 public class ClientHandler implements Runnable {
 
