@@ -1,0 +1,23 @@
+version: "3.5"
+
+services:
+  dui:
+    image: dui
+    build: .
+    stop_signal: SIGINT
+    networks:
+      - dui
+    deploy:
+      mode: global
+
+# Overlay doesn't support multicast
+# https://github.com/docker/libnetwork/issues/552 / https://github.com/docker/libnetwork/issues/552#issuecomment-343067616
+# https://github.com/moby/moby/issues/3043
+# macvlan by default is host bound, if you want you need to set it to scope "swarm": https://gist.github.com/thaJeztah/83e7469c85bac28ae90b5178a4919301
+# driver:
+#  driver-opts:encrypted
+#
+networks:
+  dui:
+    external: true
+
