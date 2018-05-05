@@ -21,21 +21,28 @@ spec:
         - name: master
           image: caladreas/buming:0.2.0
           ports:
-            - name: http
+            - name: external
               containerPort: 7777
+            - name: interal
+              containerPort: 7781
+            - name: group
+              containerPort: 7791
+            - name: hc
+              containerPort: 8888
           lifecycle:
             preStop:
               exec:
                 command: ["killall", "java" , "-INT"]
           readinessProbe:
-            httpGet:
-              path: /
+            tcpSocket:
               port: 8888
-            periodSeconds: 1
+            initialDelaySeconds: 5
+            periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /
+            tcpSocket:
               port: 8888
+            initialDelaySeconds: 15
+            periodSeconds: 20
       terminationGracePeriodSeconds: 60
 
 ---
