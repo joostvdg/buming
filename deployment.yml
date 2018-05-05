@@ -20,6 +20,9 @@ spec:
       containers:
         - name: master
           image: caladreas/buming:0.2.0
+          env:
+            - name: MEMBERSHIP_UPDATE_RATE_IN_MILLIS
+              value: 2500
           ports:
             - name: external
               containerPort: 7777
