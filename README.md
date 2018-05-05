@@ -274,11 +274,10 @@ spec:
 ## Plan/TODO
 
 * Leave membership message propagation
-    * digest check should be on SEND message, as other might not have received it
-* Init logging    
+    * digest check should be on SEND message, as other might not have received it 
 * Check for current active members is broken
     * leavers are undetected!
-* CLEAN UP RECENT MESSAGES <-- check if this is done
+* ~~CLEAN UP RECENT MESSAGES <-- check if this is done~~ it gets done
 * Send membership list to others <-- current step
 * send message digest to others
     * refresh signing hash every x rotations of multicast?
