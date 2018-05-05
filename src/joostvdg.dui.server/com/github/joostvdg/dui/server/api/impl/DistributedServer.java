@@ -78,7 +78,7 @@ public class DistributedServer implements DuiServer {
         messageHandlerExecutor = Executors.newFixedThreadPool(3);
         messageOrigin = MessageOrigin.getCurrentOrigin(name);
         final long threadId = Thread.currentThread().getId();
-        g
+        
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Name\t\t\t\t:: ", name);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Internal Listening Port\t:: " + internalPort);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Group Listening Port\t\t:: " + groupPort);
