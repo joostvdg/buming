@@ -1,21 +1,21 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: vasimos
+  name: dui
 ---
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: dui-deployment
-  namespace: default
+  name: dui
+  namespace: dui
   labels:
-    k8s-app: dui
+    app: dui
 spec:
   replicas: 3
   template:
     metadata:
       labels:
-        k8s-app: dui
+        app: dui
     spec:
       containers:
         - name: master
@@ -42,11 +42,11 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: dui-service
-  namespace: default
+  name: dui
+  namespace: dui
 spec:
   selector:
-    k8s-app: dui
+    app: dui
   ports:
   - protocol: TCP
     port: 7777
