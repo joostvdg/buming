@@ -28,7 +28,7 @@ RUN /usr/bin/dui-image/bin/java --list-modules
 
 FROM debian:stable-slim
 LABEL authors="Joost van der Griendt <joostvdg@gmail.com>"
-LABEL version="0.2.0"
+LABEL version="0.3.0"
 LABEL description="Docker image for playing with java applications in a concurrent, parallel and distributed manor."
 # Add Tini - it is already included: https://docs.docker.com/engine/reference/commandline/run/
 ENV TINI_VERSION v0.18.0
