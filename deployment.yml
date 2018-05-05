@@ -43,6 +43,13 @@ spec:
               port: 8888
             initialDelaySeconds: 15
             periodSeconds: 20
+          resources:
+            limits:
+              memory: "50Mi"
+              cpu: 0.02
+            requests:
+              memory: "50Mi"
+              cpu: 0.02
       terminationGracePeriodSeconds: 60
 
 ---
