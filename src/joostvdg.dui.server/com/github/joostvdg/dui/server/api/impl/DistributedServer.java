@@ -33,7 +33,15 @@ public class DistributedServer implements DuiServer {
     private static final int MAX_NUMBER_MEMBERS = 5;
 
     private final ConcurrentHashMap<String, Membership> membershipList;
+    /* For any processed messages we get from outside
+     * TODO: we should probably filter on types
+     */
     private final ConcurrentHashMap<byte[], Long> recentProcessedMessages;
+
+    /*
+     * For any specific message we've send out, such as leave propagation, data, leadership election etc.
+     */
+    private final ConcurrentHashMap<byte[], Long> recentSendMessages;
 
     private final Logger logger;
     private final String name;
@@ -45,10 +53,12 @@ public class DistributedServer implements DuiServer {
     private final String membershipGroup;
     private final MessageOrigin messageOrigin;
 
+    private final long MEMBERSHIP_UPDATE_RATE_IN_MILLIS;
 
-
+    // TODO: make these parameters
     private static final int MAX_RECENT_DIGEST = 100;
     private static final int MAX_AGE_RECENT_DIGEST = 1000 * 60; // one minute
+    private static final int MAX_AGE_MISSING_MEMBER = 1000 * 60; // one minute
 
     private static final byte[] INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.0 500 Internal Server Error\r\n".getBytes();
     private static final byte[] SERVICE_TEMPORARILY_UNAVAILABLE_RESPONSE = "HTTP/1.0 503 Service Unavailable\r\n".getBytes();
@@ -73,11 +83,19 @@ public class DistributedServer implements DuiServer {
 
         membershipList = new ConcurrentHashMap<>();
         recentProcessedMessages = new ConcurrentHashMap<>();
+        recentSendMessages = new ConcurrentHashMap<>();
 
-        socketExecutors = Executors.newFixedThreadPool(6);
+        socketExecutors = Executors.newFixedThreadPool(8);
         messageHandlerExecutor = Executors.newFixedThreadPool(3);
         messageOrigin = MessageOrigin.getCurrentOrigin(name);
         final long threadId = Thread.currentThread().getId();
+
+        String membershipUpdateRateOverride = System.getenv("MEMBERSHIP_UPDATE_RATE_IN_MILLIS");
+        if (membershipUpdateRateOverride != null && !membershipUpdateRateOverride.trim().equals("")) {
+            MEMBERSHIP_UPDATE_RATE_IN_MILLIS = Integer.parseInt(membershipUpdateRateOverride);
+        } else {
+            MEMBERSHIP_UPDATE_RATE_IN_MILLIS = 5000L;
+        }
 
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Name\t\t\t\t:: ", name);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Internal Listening Port\t\t:: " + internalPort);
@@ -132,25 +150,22 @@ public class DistributedServer implements DuiServer {
                         return;
                     }
 
+                    if (feiwuMessage.getType().equals(FeiwuMessageType.MEMBERSHIP)) {
+                        Runnable runnable = () -> updateMemberShipListByMessage(feiwuMessage);
+                        messageHandlerExecutor.submit(runnable);
+                        logger.log(LogLevel.INFO, mainComponent, LogComponents.INTERNAL, threadId, " Received: ", feiwuMessage.toString());
+                    }
+
                     recentProcessedMessages.put(feiwuMessage.getDigest(), System.currentTimeMillis());
                     if (recentProcessedMessages.size() <= MAX_RECENT_DIGEST) {
                         removeOldestRecentDigest();
                     }
 
-                    if (feiwuMessage.getType().equals(FeiwuMessageType.MEMBERSHIP)) {
-                        Runnable runnable = () -> updateMemberShipListByMessage(feiwuMessage);
-                        messageHandlerExecutor.submit(runnable);
-                        logger.log(LogLevel.WARN, mainComponent, LogComponents.INTERNAL, threadId, " Received: ", feiwuMessage.toString());
-                    } else {
-                        logger.log(LogLevel.INFO, mainComponent, LogComponents.INTERNAL, threadId, " Received: ", feiwuMessage.toString());
-                    }
-
-
                 } catch (IOException e1) {
                     logger.log(LogLevel.WARN, mainComponent, LogComponents.INTERNAL, threadId, " Error while reading message: ", e1.getMessage());
                 }
             }
-            pauseAndWait(5, threadId);
+            pauseAndWait(5L, threadId);
         } catch(SocketException socketException){
             logger.log(LogLevel.WARN, mainComponent, LogComponents.INTERNAL, threadId, " Server socket ", ""+internalPort, " is closed, exiting.");
             logger.log(LogLevel.WARN, mainComponent, LogComponents.INTERNAL, threadId, " Reason for stopping:", socketException.getCause().toString());
@@ -159,7 +174,7 @@ public class DistributedServer implements DuiServer {
         }
     }
 
-    private void pauseAndWait(final int waitTimeInMillis, final long threadId) {
+    private void pauseAndWait(final long waitTimeInMillis, final long threadId) {
         try {
             Thread.sleep(waitTimeInMillis);
         } catch (InterruptedException e) {
@@ -232,10 +247,13 @@ public class DistributedServer implements DuiServer {
     }
 
     private void updateMemberShipListByMessage(final FeiwuMessage feiwuMessage) {
-        long threadId = Thread.currentThread().getId();
+        final long threadId = Thread.currentThread().getId();
         MessageOrigin messageOrigin = feiwuMessage.getMessageOrigin();
         byte[] messageDigest = feiwuMessage.getDigest();
-        if (feiwuMessage.getMessage().equals(ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE)) {
+        if (feiwuMessage.getMessage().equals(ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE) ) {
+            if (recentProcessedMessages.containsKey(feiwuMessage.getDigest())) {
+                return;
+            }
             logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Received membership leave notice from ", messageOrigin.toString());
             membershipList.remove(messageOrigin.getHost());
             try {
@@ -254,37 +272,55 @@ public class DistributedServer implements DuiServer {
     }
 
     private void propagateMembershipLeaveNotice(final MessageOrigin messageOriginLeaver, final byte[] messageDigest) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
-        if (recentProcessedMessages.containsKey(messageDigest)) {
+        if (recentSendMessages.containsKey(messageDigest)) {
             long threadId = Thread.currentThread().getId();
             logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, " not propagating message as digest is in recent list");
         } else {
+            recentSendMessages.put(messageDigest, System.currentTimeMillis());
             for (String hostname : membershipList.keySet()) {
                 sendMembershipLeaveMessage(hostname, messageOriginLeaver);
             }
         }
     }
 
-    private void sendMembershipLeaveMessage(final String targetHostname, final MessageOrigin messageOriginLeaver) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
-        try (Socket socket = new Socket(targetHostname, internalPort)) {
+    private void sendMembershipLeaveMessage(final String memberHost, final MessageOrigin messageOriginLeaver) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
+        Feiwu feiwuMessage = new Feiwu(FeiwuMessageType.MEMBERSHIP, ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE, messageOriginLeaver);
+        sendMessageToMember(memberHost, feiwuMessage);
+    }
+
+    private void sendMessageToMember(final String memberHost, final Feiwu feiwuMessage) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
+        try (Socket socket = new Socket(memberHost, internalPort)) {
             try (OutputStream mOutputStream = socket.getOutputStream()) {
                 try (BufferedOutputStream out = new BufferedOutputStream(mOutputStream)) {
-                    Feiwu feiwuMessage = new Feiwu(FeiwuMessageType.MEMBERSHIP, ProtocolConstants.MEMBERSHIP_LEAVE_MESSAGE, messageOriginLeaver);
                     feiwuMessage.writeMessage(out);
                     out.flush();
+                    recentSendMessages.put(feiwuMessage.getDigest(), System.currentTimeMillis());
                 }
             }
         } catch (UnknownHostException e) {
-            throw new MessageTargetDoesNotExistException("Could not send message to unknown host " + targetHostname);
+            handleMemberNotReachable(memberHost);
+            throw new MessageTargetDoesNotExistException("Could not send message to unknown host " + memberHost);
         } catch (IOException e) {
             if (e instanceof ConnectException) {
-                throw new MessageTargetNotAvailableException("Could not send message to " + targetHostname+ " on port " + internalPort);
+                throw new MessageTargetNotAvailableException("Could not send message to " + memberHost+ " on port " + internalPort);
             }
             throw new MessageDeliveryException("Could deliver message to " + internalPort + " because " + e.getMessage());
         }
     }
 
+    private void handleMemberNotReachable(String memberKey) {
+        final long threadId = Thread.currentThread().getId();
+        Membership membership = membershipList.get(memberKey);
+        if (membership == null) {
+            logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Membership ", memberKey, " does not exist in membership (already deleted?)");
+            return;
+        }
+        logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Membership ", memberKey, " was not reachable, increase failed check count");
+        membership.incrementFailedCheckCount();
+    }
+
     private void updateMember(final MessageOrigin messageOrigin) {
-        long threadId = Thread.currentThread().getId();
+        final long threadId = Thread.currentThread().getId();
         Membership membership = membershipList.get(messageOrigin.getHost());
         if (membership == null) {
             logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Attempt to update member that does not exist");
@@ -322,6 +358,44 @@ public class DistributedServer implements DuiServer {
         }
     }
 
+    private void checkMembers() {
+        final long threadId = Thread.currentThread().getId();
+        final long waitTimeInMillis = 10000L;
+        while(!isStopped()) {
+            logger.log(LogLevel.INFO, mainComponent, LogComponents.MAIN, threadId, "Checking member status of " + membershipList.keySet().size() + " members, again in " + (waitTimeInMillis / 1000), " seconds");
+            for (String host : membershipList.keySet()) {
+                Feiwu feiwuMessage = new Feiwu(FeiwuMessageType.HELLO, "Check", messageOrigin);
+                try {
+                    sendMessageToMember(host, feiwuMessage);
+                } catch (MessageTargetDoesNotExistException | MessageDeliveryException | MessageTargetNotAvailableException e) {
+                    logger.log(LogLevel.ERROR, mainComponent, LogComponents.MAIN, threadId, "Failed checking up on a member: ", e.getMessage());
+                }
+            }
+            pauseAndWait(waitTimeInMillis, threadId);
+        }
+    }
+
+    private void removeFailedMembers() {
+        final long threadId = Thread.currentThread().getId();
+        final long waitTimeInMillis = 10000L;
+        while(!isStopped()) {
+            var keysToRemove = new ArrayList<String>();
+            logger.log(LogLevel.INFO, mainComponent, LogComponents.MAIN, threadId, "Removing failed members, again in " + (waitTimeInMillis / 1000), " seconds");
+            for (Map.Entry<String, Membership> entry : membershipList.entrySet()) {
+                var member = entry.getValue();
+                long lastSeenDelta = System.currentTimeMillis() - member.getLastSeen();
+                if (member.failedCheckCount() > 2 || lastSeenDelta > MAX_AGE_MISSING_MEMBER) {
+                    keysToRemove.add(entry.getKey());
+                }
+            }
+            for (String keyToRemove : keysToRemove) {
+                membershipList.remove(keyToRemove);
+                logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Removing member ", keyToRemove);
+            }
+            pauseAndWait(waitTimeInMillis, threadId);
+        }
+    }
+
     private void sendMemberShipUpdates(){
         final long threadId = Thread.currentThread().getId();
         try (DatagramSocket socket = new DatagramSocket()) {
@@ -332,7 +406,7 @@ public class DistributedServer implements DuiServer {
                 byte[] buf = feiwu.writeToBuffer();
                 DatagramPacket packet = new DatagramPacket(buf, buf.length, group, groupPort);
                 socket.send(packet);
-               pauseAndWait(1000, threadId);
+                pauseAndWait(MEMBERSHIP_UPDATE_RATE_IN_MILLIS, threadId);
             }
         } catch (IOException e) {
             String cause = e.getCause() == null ? "" : e.getCause().getMessage();
@@ -354,32 +428,32 @@ public class DistributedServer implements DuiServer {
         socketExecutors.submit(this::cleanUpRecentDigests);
 
         // Lets first wait before we start updating the membership lists
-        pauseAndWait(2500, threadId);
+        pauseAndWait(MEMBERSHIP_UPDATE_RATE_IN_MILLIS, threadId);
         socketExecutors.submit(this::sendMemberShipUpdates);
+        socketExecutors.submit(this::checkMembers);
+        socketExecutors.submit(this::removeFailedMembers);
     }
 
     // TODO: http://www.baeldung.com/java-8-comparator-comparing
     //      http://www.baeldung.com/java-collection-min-max
     // http://www.java67.com/2017/06/how-to-remove-entry-keyvalue-from-HashMap-in-java.html
     private void removeOldestRecentDigest() {
-        Long oldest = recentProcessedMessages.values().stream().mapToLong(v -> v).min().orElse(0L);
+        removeOldestRecentEntries(recentProcessedMessages);
+        removeOldestRecentEntries(recentSendMessages);
+    }
+
+    private void removeOldestRecentEntries(final ConcurrentHashMap<byte[], Long> map) {
+        Long oldest = map.values().stream().mapToLong(v -> v).min().orElse(0L);
         if (oldest != 0L) {
-            recentProcessedMessages.values().removeAll(Collections.singleton(oldest));
+            map.values().removeAll(Collections.singleton(oldest));
         }
     }
 
+
     private void cleanUpRecentDigests() {
         while (!stopped) {
-            long currentTime = System.currentTimeMillis();
-            var keysToRemove = new ArrayList<byte[]>();
-            recentProcessedMessages.forEach((k,v) -> {
-                if (currentTime - v > MAX_AGE_RECENT_DIGEST) {
-                    keysToRemove.add(k);
-                }
-            });
-            for (byte[] key : keysToRemove) {
-                recentProcessedMessages.remove(key);
-            }
+            cleanUpRecentEntries(recentSendMessages);
+            cleanUpRecentEntries(recentProcessedMessages);
 
             try {
                 Thread.sleep(100000);
@@ -388,6 +462,19 @@ public class DistributedServer implements DuiServer {
                 logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Interrupted, going to close");
                 Thread.currentThread().interrupt();
             }
+        }
+    }
+
+    private void cleanUpRecentEntries(ConcurrentHashMap<byte[],Long> entries) {
+        long currentTime = System.currentTimeMillis();
+        var keysToRemove = new ArrayList<byte[]>();
+        entries.forEach((k,v) -> {
+            if (currentTime - v > MAX_AGE_RECENT_DIGEST) {
+                keysToRemove.add(k);
+            }
+        });
+        for (byte[] key : keysToRemove) {
+            entries.remove(key);
         }
     }
 

@@ -96,6 +96,10 @@ public final class Feiwu {
         return ByteBuffer.allocate(MESSAGE_SIZE_HEADER_SIZE).putInt(message.length).array();
     }
 
+    public byte[] getDigest() {
+        return digest;
+    }
+
     public void writeMessage(BufferedOutputStream out) throws IOException {
         out.write(FEIWU_HEADER);
         out.write(getMessageTypeHeader());
