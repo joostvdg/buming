@@ -78,13 +78,28 @@ public class DistributedServer implements DuiServer {
         messageHandlerExecutor = Executors.newFixedThreadPool(3);
         messageOrigin = MessageOrigin.getCurrentOrigin(name);
         final long threadId = Thread.currentThread().getId();
-        
+
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Name\t\t\t\t:: ", name);
-        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Internal Listening Port\t:: " + internalPort);
-        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Group Listening Port\t\t:: " + groupPort);
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Internal Listening Port\t\t:: " + internalPort);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "HealthCheck Listening Port\t:: " + healthCheckPort);
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Group Listening Port\t\t:: " + groupPort);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Group Listening Group\t\t:: ", membershipGroup);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Message Origin\t\t\t:: " + messageOrigin);
+
+        logSystemInfo(threadId);
+    }
+
+    private void logSystemInfo(final long threadId) {
+        long maxMemory = Runtime.getRuntime().maxMemory();
+        if (maxMemory == Long.MAX_VALUE) {
+            maxMemory = 0L;
+        } else {
+            maxMemory = maxMemory / 1024 / 1024;
+        }
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Available Processors\t\t:: " + Runtime.getRuntime().availableProcessors());
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Free Memory\t\t\t:: " + Runtime.getRuntime().freeMemory() / 1024 / 1024, "MB");
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Total Memory\t\t\t:: " + Runtime.getRuntime().totalMemory() / 1024 / 1024, "MB");
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Max Memory\t\t\t:: " + maxMemory, "MB");
     }
 
     private void listenToInternalCommunication() {
@@ -238,7 +253,7 @@ public class DistributedServer implements DuiServer {
         }
     }
 
-    private void propagateMembershipLeaveNotice(MessageOrigin messageOriginLeaver, byte[] messageDigest) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
+    private void propagateMembershipLeaveNotice(final MessageOrigin messageOriginLeaver, final byte[] messageDigest) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
         if (recentProcessedMessages.containsKey(messageDigest)) {
             long threadId = Thread.currentThread().getId();
             logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, " not propagating message as digest is in recent list");
@@ -249,7 +264,7 @@ public class DistributedServer implements DuiServer {
         }
     }
 
-    private void sendMembershipLeaveMessage(String targetHostname,MessageOrigin messageOriginLeaver) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
+    private void sendMembershipLeaveMessage(final String targetHostname, final MessageOrigin messageOriginLeaver) throws MessageTargetDoesNotExistException, MessageDeliveryException, MessageTargetNotAvailableException {
         try (Socket socket = new Socket(targetHostname, internalPort)) {
             try (OutputStream mOutputStream = socket.getOutputStream()) {
                 try (BufferedOutputStream out = new BufferedOutputStream(mOutputStream)) {
@@ -268,7 +283,7 @@ public class DistributedServer implements DuiServer {
         }
     }
 
-    private void updateMember(MessageOrigin messageOrigin) {
+    private void updateMember(final MessageOrigin messageOrigin) {
         long threadId = Thread.currentThread().getId();
         Membership membership = membershipList.get(messageOrigin.getHost());
         if (membership == null) {
@@ -279,7 +294,7 @@ public class DistributedServer implements DuiServer {
         }
     }
 
-    private void addMember(MessageOrigin messageOrigin) {
+    private void addMember(final MessageOrigin messageOrigin) {
         long threadId = Thread.currentThread().getId();
         Membership membership = membershipList.get(messageOrigin.getHost());
         if (membership != null) {
