@@ -1,4 +1,4 @@
-FROM openjdk:9-jdk AS build
+FROM openjdk:10-jdk AS build
 
 RUN mkdir -p /usr/src/mods/jars
 RUN mkdir -p /usr/src/mods/compiled
