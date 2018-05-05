@@ -273,8 +273,12 @@ spec:
 
 ## Plan/TODO
 
+* Leave membership message propagation
+    * digest check should be on SEND message, as other might not have received it
+* Init logging    
+* Check for current active members is broken
+    * leavers are undetected!
 * CLEAN UP RECENT MESSAGES <-- check if this is done
-* health check endpoint <-- should be done?
 * Send membership list to others <-- current step
 * send message digest to others
     * refresh signing hash every x rotations of multicast?
@@ -287,3 +291,4 @@ spec:
 * Have a API for data entries
 * Store data entries
 * Share data entries with other nodes
+* Have a Go (lang) client
