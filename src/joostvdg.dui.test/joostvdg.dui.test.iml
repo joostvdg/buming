@@ -7,9 +7,8 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="joostvdg.buming.logging" />
-    <orderEntry type="module" module-name="joostvdg.dui.api" />
     <orderEntry type="module" module-name="joostvdg.dui.client" />
     <orderEntry type="module" module-name="joostvdg.dui.server" />
+    <orderEntry type="module" module-name="joostvdg.dui.api" />
   </component>
 </module>

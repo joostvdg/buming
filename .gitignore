@@ -22,7 +22,7 @@
 hs_err_pid*
 
 \.idea/
-
+*.iml
 buming-image/
 
 dui-image/

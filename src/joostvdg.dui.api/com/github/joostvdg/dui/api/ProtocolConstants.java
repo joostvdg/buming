@@ -1,6 +1,6 @@
 package com.github.joostvdg.dui.api;
 
-public class ProtocolConstants {
+public final class ProtocolConstants {
 
     private ProtocolConstants() { } // class for constants should not be instantiatable
 

@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
 
 public class DockerApp {
     public static void main(String[] args) {
-        ServiceLoader<Logger> loggers = ServiceLoader.load(Logger.class);
+        var loggers = ServiceLoader.load(Logger.class);
         Logger logger = loggers.findFirst().isPresent() ? loggers.findFirst().get() : null;
         if (logger == null) {
             System.err.println("Did not find any loggers, quiting");
