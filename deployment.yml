@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: master
-          image: caladreas/buming
+          image: caladreas/buming:0.2.0
           ports:
             - name: http
               containerPort: 7777
@@ -27,6 +27,15 @@ spec:
             preStop:
               exec:
                 command: ["killall", "java" , "-INT"]
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8888
+            periodSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8888
       terminationGracePeriodSeconds: 60
 
 ---
