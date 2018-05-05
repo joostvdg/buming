@@ -28,10 +28,10 @@ RUN /usr/bin/dui-image/bin/java --list-modules
 
 FROM debian:stable-slim
 LABEL authors="Joost van der Griendt <joostvdg@gmail.com>"
-LABEL version="0.1.0"
+LABEL version="0.2.0"
 LABEL description="Docker image for playing with java applications in a concurrent, parallel and distributed manor."
 # Add Tini - it is already included: https://docs.docker.com/engine/reference/commandline/run/
-ENV TINI_VERSION v0.16.1
+ENV TINI_VERSION v0.18.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "-vv","-g", "--", "/usr/bin/dui/bin/dui","-XX:+UseCGroupMemoryLimitForHeap", "-XX:+UnlockExperimentalVMOptions"]
