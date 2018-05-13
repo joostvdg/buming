@@ -1,17 +1,15 @@
 package com.github.joostvdg.dui.server.api.impl;
 
-import com.github.joostvdg.dui.api.ProtocolConstants;
+import com.github.joostvdg.dui.api.*;
 import com.github.joostvdg.dui.api.exception.MessageDeliveryException;
 import com.github.joostvdg.dui.api.exception.MessageTargetDoesNotExistException;
 import com.github.joostvdg.dui.api.exception.MessageTargetNotAvailableException;
-import com.github.joostvdg.dui.api.Feiwu;
 import com.github.joostvdg.dui.api.message.FeiwuMessage;
 import com.github.joostvdg.dui.api.message.FeiwuMessageType;
 import com.github.joostvdg.dui.api.message.MessageOrigin;
 import com.github.joostvdg.dui.logging.LogLevel;
 import com.github.joostvdg.dui.logging.Logger;
 import com.github.joostvdg.dui.server.api.DuiServer;
-import com.github.joostvdg.dui.api.Membership;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -22,17 +20,47 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.lang.Thread.sleep;
 
 public class DistributedServer implements DuiServer {
-    private volatile boolean stopped = false;
-    private volatile boolean closed = false;
 
+    private static final int MAX_NUMBER_MEMBERS = 15;
+    private static final byte[] INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.0 500 Internal Server Error\r\n".getBytes();
+    private static final byte[] SERVICE_TEMPORARILY_UNAVAILABLE_RESPONSE = "HTTP/1.0 503 Service Unavailable\r\n".getBytes();
+    private static final byte[] OK_RESPONSE = "HTTP/1.1 200 OK\r\n".getBytes();
+
+    private static final class LogComponents {
+        private static final String INTERNAL = "Internal";
+        private static final String HEALTH_CHECK = "HealthCheck";
+        private static final String MAIN = "Main";
+        private static final String GROUP = "Group";
+        private static final String INIT = "Init";
+        private static final String LEADER_ELECTION = "LeaderElection";
+    }
+
+    private static final class Defaults {
+        private static final int MAX_RECENT_DIGEST = 100;
+        private static final int MAX_AGE_RECENT_DIGEST = 1000 * 60; // one minute
+        private static final int MAX_AGE_MISSING_MEMBER = 1000 * 60; // one minute
+        private static final long MEMBERSHIP_UPDATE_RATE_IN_MILLIS = 5000;
+        private static final byte NODE_ROLE = 0x00; // manager
+    }
+
+    private static final class ENV {
+        private static final String MAX_RECENT_DIGEST = "MAX_RECENT_DIGEST";
+        private static final String MAX_AGE_RECENT_DIGEST = "MAX_AGE_RECENT_DIGEST";
+        private static final String MAX_AGE_MISSING_MEMBER = "MAX_AGE_MISSING_MEMBER";
+        private static final String MEMBERSHIP_UPDATE_RATE_IN_MILLIS = "membershipUpdateRateInMillis";
+        private static final String NODE_ROLE = "NODE_ROLE";
+    }
+
+    private final ExecutorService leaderElectionExecutor;
     private final ExecutorService socketExecutors;
     private final ExecutorService messageHandlerExecutor;
-
-    private static final int MAX_NUMBER_MEMBERS = 5;
-
     private final ConcurrentHashMap<String, Membership> membershipList;
+
     /* For any processed messages we get from outside
      * TODO: we should probably filter on types
      */
@@ -46,31 +74,26 @@ public class DistributedServer implements DuiServer {
     private final Logger logger;
     private final String name;
     private final String mainComponent;
-    private ServerSocket serverSocket;
     private final int internalPort;
     private final int groupPort;
     private final int healthCheckPort;
     private final String membershipGroup;
     private final MessageOrigin messageOrigin;
 
-    private final long MEMBERSHIP_UPDATE_RATE_IN_MILLIS;
+    /* PARAMETERS */
+    private final int maxRecentDigest;
+    private final int maxAgeRecentDigest;
+    private final int maxAgeMissingMember;
+    private final long membershipUpdateRateInMillis;
+    private final byte role;
+    private final Node node;
 
-    // TODO: make these parameters
-    private static final int MAX_RECENT_DIGEST = 100;
-    private static final int MAX_AGE_RECENT_DIGEST = 1000 * 60; // one minute
-    private static final int MAX_AGE_MISSING_MEMBER = 1000 * 60; // one minute
-
-    private static final byte[] INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.0 500 Internal Server Error\r\n".getBytes();
-    private static final byte[] SERVICE_TEMPORARILY_UNAVAILABLE_RESPONSE = "HTTP/1.0 503 Service Unavailable\r\n".getBytes();
-    private static final byte[] OK_RESPONSE = "HTTP/1.1 200 OK\r\n".getBytes();
-
-    private static final class LogComponents {
-        private static final String INTERNAL = "Internal";
-        private static final String HEALTH_CHECK = "HealthCheck";
-        private static final String MAIN = "Main";
-        private static final String GROUP = "Group";
-        private static final String INIT = "Init";
-    }
+    private ServerSocket serverSocket;
+    private AtomicInteger leaderElectionRound;
+    private volatile boolean stopped = false;
+    private volatile boolean closed = false;
+    private volatile long leaderElectionTimeout;
+    private volatile long leaderElectionTimerStart;
 
     public DistributedServer(final int listenPort, final String membershipGroup, final String name, final Logger logger) {
         this.name = name;
@@ -85,27 +108,115 @@ public class DistributedServer implements DuiServer {
         recentProcessedMessages = new ConcurrentHashMap<>();
         recentSendMessages = new ConcurrentHashMap<>();
 
+        membershipUpdateRateInMillis = getLongEnvOrDefault(ENV.MEMBERSHIP_UPDATE_RATE_IN_MILLIS, Defaults.MEMBERSHIP_UPDATE_RATE_IN_MILLIS);
+        maxRecentDigest = getIntEnvOrDefault(ENV.MAX_RECENT_DIGEST, Defaults.MAX_RECENT_DIGEST);
+        maxAgeRecentDigest = getIntEnvOrDefault(ENV.MAX_AGE_RECENT_DIGEST, Defaults.MAX_AGE_RECENT_DIGEST);
+        maxAgeMissingMember = getIntEnvOrDefault(ENV.MAX_AGE_MISSING_MEMBER, Defaults.MAX_AGE_MISSING_MEMBER);
+        role = getByteEnvOrDefault(ENV.NODE_ROLE, Defaults.NODE_ROLE);
+
+        var roleDescription = role == 0x00 ? "Manager" : "Worker";
         socketExecutors = Executors.newFixedThreadPool(8);
         messageHandlerExecutor = Executors.newFixedThreadPool(3);
-        messageOrigin = MessageOrigin.getCurrentOrigin(name);
+        leaderElectionExecutor = Executors.newSingleThreadExecutor();
+        messageOrigin = MessageOrigin.getCurrentOrigin(name, roleDescription);
+        node = new Node(name, messageOrigin.getHost(), messageOrigin.getIp());
+        node.setRole(role);
+        node.setStatus(LeaderElectionStatus.NONE);
+        node.updateUptime();
+
         final long threadId = Thread.currentThread().getId();
-
-        String membershipUpdateRateOverride = System.getenv("MEMBERSHIP_UPDATE_RATE_IN_MILLIS");
-        if (membershipUpdateRateOverride != null && !membershipUpdateRateOverride.trim().equals("")) {
-            MEMBERSHIP_UPDATE_RATE_IN_MILLIS = Integer.parseInt(membershipUpdateRateOverride);
-        } else {
-            MEMBERSHIP_UPDATE_RATE_IN_MILLIS = 5000L;
-        }
-
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Name\t\t\t\t:: ", name);
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Role\t\t\t\t:: ", roleDescription);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Internal Listening Port\t\t:: " + internalPort);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "HealthCheck Listening Port\t:: " + healthCheckPort);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Group Listening Port\t\t:: " + groupPort);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Group Listening Group\t\t:: ", membershipGroup);
         logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Message Origin\t\t\t:: " + messageOrigin);
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.INIT, threadId, "Node\t\t\t:: " + node.toString());
 
         logSystemInfo(threadId);
+
+        leaderElectionRound = new AtomicInteger(0);
+        setLeaderElectionTimeout();
     }
+
+    @Override
+    public void startServer() {
+        if (closed) {
+            throw new IllegalStateException("Server is already closed!");
+        }
+
+        final long threadId = Thread.currentThread().getId();
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.MAIN, threadId, " Starting: ", this.messageOrigin.toString());
+        socketExecutors.submit(this::listenToHealthCheck);
+        socketExecutors.submit(this::listenToInternalCommunication);
+        socketExecutors.submit(this::listenToInternalGroup);
+        socketExecutors.submit(this::cleanUpRecentDigests);
+
+        leaderElectionExecutor.submit(this::handleLeadershipElectionCycles);
+
+        // Lets first wait before we start updating the membership lists
+        pauseAndWait(membershipUpdateRateInMillis, threadId);
+        socketExecutors.submit(this::sendMemberShipUpdates);
+        socketExecutors.submit(this::checkMembers);
+        socketExecutors.submit(this::removeFailedMembers);
+    }
+
+    private void handleLeadershipElectionCycles(){
+        final long threadId = Thread.currentThread().getId();
+        // go into election proposal mode
+        electionProposal();
+
+        // loop every x millis,waiting for timer
+        while (!stopped) {
+            if (System.currentTimeMillis() > (leaderElectionTimeout + leaderElectionTimerStart)) {
+                electionProposal();
+            }
+            try {
+                sleep(100);
+            } catch (InterruptedException e) {
+                logger.log(LogLevel.WARN, mainComponent, LogComponents.LEADER_ELECTION, threadId, " Something went wrong waiting for timer" );
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    // TODO: complete this
+    private void electionProposal() {
+        final long threadId = Thread.currentThread().getId();
+        setLeaderElectionTimeout();
+        node.setStatus(LeaderElectionStatus.CANDIDATE);
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.LEADER_ELECTION, threadId, "Electing myself leader [status: ", node.getStatus().toString(), ",round: " +leaderElectionRound, "]");
+        leaderElectionTimerStart = System.currentTimeMillis();
+        leaderElectionRound.getAndIncrement();
+    }
+
+    // TODO: introduce leader election message type
+    // if election message received, and NOT in election mode, accept leader and reset timer
+    // if election message received, and IN election mode, ignore message
+
+    private void setLeaderElectionTimeout() {
+        final long threadId = Thread.currentThread().getId();
+        leaderElectionTimeout = new Random().nextInt(3000)
+            + new Random().nextInt(3000)
+            + new Random().nextInt(3000)
+            + new Random().nextInt(3000)
+            + 8000L;
+        logger.log(LogLevel.INFO, mainComponent, LogComponents.LEADER_ELECTION, threadId, "Leader election timer set to: " + leaderElectionTimeout);
+    }
+
+    private long getLongEnvOrDefault(String envKey, long defaultValue) {
+        return System.getenv(envKey) != null ? Long.parseLong(System.getenv(envKey)) : defaultValue;
+    }
+
+    private int getIntEnvOrDefault(String envKey, int defaultValue) {
+        return System.getenv(envKey) != null ? Integer.parseInt(System.getenv(envKey)) : defaultValue;
+    }
+
+    private byte getByteEnvOrDefault(String envKey, byte defaultValue) {
+        return System.getenv(envKey) != null ? Byte.parseByte(System.getenv(envKey)) : defaultValue;
+    }
+
 
     private void logSystemInfo(final long threadId) {
         long maxMemory = Runtime.getRuntime().maxMemory();
@@ -157,7 +268,7 @@ public class DistributedServer implements DuiServer {
                     }
 
                     recentProcessedMessages.put(feiwuMessage.getDigest(), System.currentTimeMillis());
-                    if (recentProcessedMessages.size() <= MAX_RECENT_DIGEST) {
+                    if (recentProcessedMessages.size() <= maxRecentDigest) {
                         removeOldestRecentDigest();
                     }
 
@@ -176,7 +287,7 @@ public class DistributedServer implements DuiServer {
 
     private void pauseAndWait(final long waitTimeInMillis, final long threadId) {
         try {
-            Thread.sleep(waitTimeInMillis);
+            sleep(waitTimeInMillis);
         } catch (InterruptedException e) {
             logger.log(LogLevel.WARN, mainComponent, LogComponents.INTERNAL, threadId, " Interrupted, stopping");
             // restoring interrupt
@@ -199,7 +310,8 @@ public class DistributedServer implements DuiServer {
                         logger.log(LogLevel.WARN, mainComponent, LogComponents.HEALTH_CHECK, threadId, " Stopped, 503");
                         out.write(SERVICE_TEMPORARILY_UNAVAILABLE_RESPONSE);
                     } else {
-                        logger.log(LogLevel.INFO, mainComponent, LogComponents.HEALTH_CHECK, threadId, " 200 OK");
+                        node.updateUptime();
+                        logger.log(LogLevel.INFO, mainComponent, LogComponents.HEALTH_CHECK, threadId, " 200 OK ", this.node.toString());
                         out.write(OK_RESPONSE);
                     }
                     out.flush();
@@ -340,7 +452,8 @@ public class DistributedServer implements DuiServer {
                 removeLastSeenMember();
             }
             long currentTime = System.currentTimeMillis();
-            Membership newMembership = new Membership(messageOrigin.getName(), currentTime);
+            //TODO: determine role
+            Membership newMembership = new Membership(messageOrigin.getName(), "UNKNOWN" ,currentTime);
             membershipList.put(messageOrigin.getHost(), newMembership);
         }
     }
@@ -384,7 +497,7 @@ public class DistributedServer implements DuiServer {
             for (Map.Entry<String, Membership> entry : membershipList.entrySet()) {
                 var member = entry.getValue();
                 long lastSeenDelta = System.currentTimeMillis() - member.getLastSeen();
-                if (member.failedCheckCount() > 2 || lastSeenDelta > MAX_AGE_MISSING_MEMBER) {
+                if (member.failedCheckCount() > 2 || lastSeenDelta > maxAgeMissingMember) {
                     keysToRemove.add(entry.getKey());
                 }
             }
@@ -406,32 +519,12 @@ public class DistributedServer implements DuiServer {
                 byte[] buf = feiwu.writeToBuffer();
                 DatagramPacket packet = new DatagramPacket(buf, buf.length, group, groupPort);
                 socket.send(packet);
-                pauseAndWait(MEMBERSHIP_UPDATE_RATE_IN_MILLIS, threadId);
+                pauseAndWait(membershipUpdateRateInMillis, threadId);
             }
         } catch (IOException e) {
             String cause = e.getCause() == null ? "" : e.getCause().getMessage();
             logger.log(LogLevel.ERROR, mainComponent, LogComponents.MAIN, threadId, " Problem occurred sending membership updates", e.getMessage(), cause);
         }
-    }
-
-    @Override
-    public void startServer() {
-        if (closed) {
-            throw new IllegalStateException("Server is already closed!");
-        }
-
-        final long threadId = Thread.currentThread().getId();
-        logger.log(LogLevel.INFO, mainComponent, LogComponents.MAIN, threadId, " Starting: ", this.messageOrigin.toString());
-        socketExecutors.submit(this::listenToHealthCheck);
-        socketExecutors.submit(this::listenToInternalCommunication);
-        socketExecutors.submit(this::listenToInternalGroup);
-        socketExecutors.submit(this::cleanUpRecentDigests);
-
-        // Lets first wait before we start updating the membership lists
-        pauseAndWait(MEMBERSHIP_UPDATE_RATE_IN_MILLIS, threadId);
-        socketExecutors.submit(this::sendMemberShipUpdates);
-        socketExecutors.submit(this::checkMembers);
-        socketExecutors.submit(this::removeFailedMembers);
     }
 
     // TODO: http://www.baeldung.com/java-8-comparator-comparing
@@ -456,7 +549,7 @@ public class DistributedServer implements DuiServer {
             cleanUpRecentEntries(recentProcessedMessages);
 
             try {
-                Thread.sleep(100000);
+                sleep(100000);
             } catch (InterruptedException e) {
                 final long threadId = Thread.currentThread().getId();
                 logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Interrupted, going to close");
@@ -469,7 +562,7 @@ public class DistributedServer implements DuiServer {
         long currentTime = System.currentTimeMillis();
         var keysToRemove = new ArrayList<byte[]>();
         entries.forEach((k,v) -> {
-            if (currentTime - v > MAX_AGE_RECENT_DIGEST) {
+            if (currentTime - v > maxAgeRecentDigest) {
                 keysToRemove.add(k);
             }
         });
@@ -518,7 +611,7 @@ public class DistributedServer implements DuiServer {
         }
         socketExecutors.shutdown();
         try {
-            Thread.sleep(500);
+            sleep(500);
         } catch (InterruptedException e) {
             logger.log(LogLevel.WARN, mainComponent, LogComponents.MAIN, threadId, "Was interrupted while closing");
             // restoring interrupt

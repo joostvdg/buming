@@ -37,7 +37,7 @@ public class DemoClient extends Thread {
             // out.println("[Client][" + threadId + "]" + i);
             String rawMessage = "Hello from " + clientName;
             byte[] message = rawMessage.getBytes();
-            Feiwu feiwuMessage = new Feiwu(FeiwuMessageType.HELLO, message, MessageOrigin.getCurrentOrigin(hostName));
+            Feiwu feiwuMessage = new Feiwu(FeiwuMessageType.HELLO, message, MessageOrigin.getCurrentOrigin(hostName, "Simple"));
             feiwuMessage.writeMessage(out);
             out.flush();
         } catch (IOException e) {

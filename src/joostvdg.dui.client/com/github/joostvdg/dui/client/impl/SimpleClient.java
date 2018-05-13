@@ -53,7 +53,7 @@ public class SimpleClient implements DuiClient {
         try (Socket kkSocket = new Socket(hostName, port)) {
             try (OutputStream mOutputStream = kkSocket.getOutputStream()) {
                 try (BufferedOutputStream out = new BufferedOutputStream(mOutputStream)) {
-                    Feiwu feiwuMessage = new Feiwu(type, message, MessageOrigin.getCurrentOrigin(hostName));
+                    Feiwu feiwuMessage = new Feiwu(type, message, MessageOrigin.getCurrentOrigin(hostName, "Simple"));
                     feiwuMessage.writeMessage(out);
                     out.flush();
                 }

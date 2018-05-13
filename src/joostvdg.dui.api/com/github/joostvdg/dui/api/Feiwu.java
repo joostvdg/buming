@@ -173,7 +173,7 @@ public final class Feiwu {
         int messageSize = java.nio.ByteBuffer.wrap(messageSizeHeaderSegment).order(ByteOrder.BIG_ENDIAN).getInt();
 
         // CHECK HEADER CORRECTNESS
-        if (!(bytesRead == Feiwu.FIXED_HEADER_SIZE)) {
+        if (bytesRead != Feiwu.FIXED_HEADER_SIZE) {
             String errorMessage = "It is not a FeiWu message";
             System.err.println(errorMessage);
             throw new IllegalArgumentException(errorMessage);

@@ -36,7 +36,7 @@ ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "-vv","-g", "--", "/usr/bin/dui/bin/dui","-XX:+UseCGroupMemoryLimitForHeap", "-XX:+UnlockExperimentalVMOptions"]
 ENV DATE_CHANGED="20180120-1525"
-HEALTHCHECK --interval=5s --start-period=10s --timeout=10s CMD wget --server-response http://localhost:8888 -O ip-current 2>&1| grep -c 'HTTP/1.1 200 OK'
+HEALTHCHECK --interval=12s --start-period=12s --timeout=20s CMD wget --server-response http://localhost:8888 -O ip-current 2>&1| grep -c 'HTTP/1.1 200 OK'
 RUN apt-get update && apt-get install --no-install-recommends -y psmisc=22.* wget=1.* && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/bin/dui-image/ /usr/bin/dui
 RUN /usr/bin/dui/bin/java --list-modules

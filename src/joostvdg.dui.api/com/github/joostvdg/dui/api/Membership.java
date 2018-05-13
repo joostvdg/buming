@@ -5,13 +5,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class Membership {
     private final String name;
+    private final String role;
     private final AtomicLong lastSeen;
     private final AtomicInteger failedChecksCount;
 
-    public Membership(String name, long lastSeen) {
+    public Membership(String name, String role, long lastSeen) {
         this.name = name;
         this.lastSeen = new AtomicLong(lastSeen);
         this.failedChecksCount = new AtomicInteger(0);
+        this.role = role;
     }
 
     public String getName() {
@@ -34,10 +36,15 @@ public class Membership {
         return failedChecksCount.incrementAndGet();
     }
 
+    public String getRole(){
+        return role;
+    }
+
     @Override
     public String toString() {
         return "Membership{" +
             "name='" + name + '\'' +
+            ",role='" + role + '\'' +
             ", lastSeen=" + lastSeen.get() +
             ", failedChecksCount=" + failedChecksCount.get() +
             '}';

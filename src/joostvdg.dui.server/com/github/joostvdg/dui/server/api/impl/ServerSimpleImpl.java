@@ -46,7 +46,7 @@ public class ServerSimpleImpl implements DuiServer {
         membershipList = new ConcurrentHashMap<>();
         for (int i = INTERNAL_COMMUNICATION_PORT_A; i <= INTERNAL_COMMUNICATION_PORT_C; i++) { // TODO: determine actual/current membership list
             if (internalPort != i) {
-                Membership membership = new Membership(""+i, System.currentTimeMillis());
+                Membership membership = new Membership(""+i, "SIMPLE", System.currentTimeMillis());
                 membershipList.put(i, membership);
             }
         }
@@ -116,7 +116,7 @@ public class ServerSimpleImpl implements DuiServer {
             Membership existingMemberShip = membershipList.get(port);
             existingMemberShip.updateLastSeen(System.currentTimeMillis());
         } else {
-            Membership newMembership = new Membership(serverName, System.currentTimeMillis());
+            Membership newMembership = new Membership(serverName, "SIMPLE", System.currentTimeMillis());
             membershipList.put(port, newMembership);
         }
     }

@@ -273,10 +273,19 @@ spec:
 
 ## Plan/TODO
 
-* Leave membership message propagation
-    * digest check should be on SEND message, as other might not have received it 
+* parameterize timers/counts
+    * ~~send membership update~~
+    * max recent digests
+    * max recent digests age
+* Go tool with shows status / data in DUI distributed system
+    * keep info in etcd?!
+    * have UI, so we can test ingress/service mesh    
 * Check for current active members is broken
     * leavers are undetected!
+    * we need a regular check for membership member's existence
+    * generic host not found processing for member that is not reachable
+    * when more than x amount of failures, only then remove
+* leadership election    
 * ~~CLEAN UP RECENT MESSAGES <-- check if this is done~~ it gets done
 * Send membership list to others <-- current step
 * send message digest to others

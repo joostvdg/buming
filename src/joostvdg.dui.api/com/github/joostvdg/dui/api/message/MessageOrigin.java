@@ -11,26 +11,30 @@ public class MessageOrigin {
     private final String host;
     private final String ip;
     private final String name;
+    private final String role;
     private final String flatRepresentation;
     private static final String SEPARATOR = ",";
     // Valid linux host names: https://stackoverflow.com/questions/3523028/valid-characters-of-a-hostname
 
     // TODO: add regex test for the variables
 
-    public MessageOrigin(String host, String ip, String name) {
+    public MessageOrigin(final String host, final String ip, final String name, final String role) {
         this.host = host;
         this.ip = ip;
         this.name = name;
+        this.role = role;
         StringBuffer buffer = new StringBuffer();
         buffer.append(host);
         buffer.append(SEPARATOR);
         buffer.append(ip);
         buffer.append(SEPARATOR);
         buffer.append(name);
+        buffer.append(SEPARATOR);
+        buffer.append(role);
         flatRepresentation = buffer.toString();
     }
 
-    public static MessageOrigin getCurrentOrigin(final String name) {
+    public static MessageOrigin getCurrentOrigin(final String name, final String role) {
         // https://stackoverflow.com/questions/7348711/recommended-way-to-get-hostname-in-java
         String ip = null;
         String host = null;
@@ -40,7 +44,7 @@ public class MessageOrigin {
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
-        return new MessageOrigin(host, ip, name);
+        return new MessageOrigin(host, ip, name, role);
     }
 
     public String getHost() {
@@ -69,7 +73,8 @@ public class MessageOrigin {
         String host = split[0];
         String ip = split[1];
         String name = split[2];
-        return new MessageOrigin(host, ip, name);
+        String role = split[3];
+        return new MessageOrigin(host, ip, name, role);
     }
 
     @Override
@@ -77,6 +82,7 @@ public class MessageOrigin {
         return "MessageOrigin{" +
             "host='" + host + '\'' +
             ", ip='" + ip + '\'' +
+            ", role='" + role + '\'' +
             ", name='" + name + '\'' +
             '}';
     }
