@@ -42,13 +42,13 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 8888
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 25
+            periodSeconds: 15
           livenessProbe:
             tcpSocket:
               port: 8888
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            initialDelaySeconds: 45
+            periodSeconds: 30
           resources:
             limits:
               memory: "50Mi"
