@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: dui
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dui
@@ -12,6 +12,9 @@ metadata:
     app: dui
 spec:
   replicas: 3
+  selector:
+      matchLabels:
+          app: dui
   template:
     metadata:
       labels:
