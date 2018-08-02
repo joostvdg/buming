@@ -1,51 +1,59 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "dui.fullname" . }}
-  labels:
-    app: {{ include "dui.name" . }}
-    chart: {{ include "dui.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
-spec:
-  replicas: {{ .Values.replicaCount }}
-  selector:
-    matchLabels:
-      app: {{ include "dui.name" . }}
-      release: {{ .Release.Name }}
-  template:
-    metadata:
-      labels:
+    name: {{ include "dui.fullname" . }}
+    labels:
         app: {{ include "dui.name" . }}
+        chart: {{ include "dui.chart" . }}
         release: {{ .Release.Name }}
-    spec:
-      containers:
-        - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: 80
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
-{{ toYaml .Values.resources | indent 12 }}
-    {{- with .Values.nodeSelector }}
-      nodeSelector:
-{{ toYaml . | indent 8 }}
-    {{- end }}
-    {{- with .Values.affinity }}
-      affinity:
-{{ toYaml . | indent 8 }}
-    {{- end }}
-    {{- with .Values.tolerations }}
-      tolerations:
-{{ toYaml . | indent 8 }}
-    {{- end }}
+        heritage: {{ .Release.Service }}
+spec:
+    replicas: {{ .Values.replicaCount }}
+    selector:
+        matchLabels:
+            app: {{ include "dui.name" . }}
+            release: {{ .Release.Name }}
+    template:
+        metadata:
+            labels:
+                app: {{ include "dui.name" . }}
+                release: {{ .Release.Name }}
+        spec:
+            containers:
+            - name: {{ .Chart.Name }}
+              image: "caladreas/buming:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+              - name: MEMBERSHIP_UPDATE_RATE_IN_MILLIS
+                value: "2500"
+              ports:
+              - name: external
+                containerPort: 7777
+              - name: interal
+                containerPort: 7781
+              - name: group
+                containerPort: 7791
+              - name: hc
+                containerPort: 8888
+              lifecycle:
+                  preStop:
+                      exec:
+                          command: ["killall", "java" , "-INT"]
+              readinessProbe:
+                  tcpSocket:
+                      port: 8888
+                  initialDelaySeconds: 25
+                  periodSeconds: 15
+              livenessProbe:
+                  tcpSocket:
+                      port: 8888
+                  initialDelaySeconds: 45
+                  periodSeconds: 30
+              resources:
+                  limits:
+                      memory: "50Mi"
+                      cpu: "0.02"
+                  requests:
+                      memory: "50Mi"
+                      cpu: "0.02"
+            terminationGracePeriodSeconds: 60
