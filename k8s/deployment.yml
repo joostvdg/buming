@@ -13,8 +13,8 @@ metadata:
 spec:
   replicas: 3
   selector:
-      matchLabels:
-          app: dui
+    matchLabels:
+      app: dui
   template:
     metadata:
       labels:
@@ -24,8 +24,8 @@ spec:
         - name: master
           image: caladreas/buming:0.3.0
           env:
-          - name: MEMBERSHIP_UPDATE_RATE_IN_MILLIS
-            value: 2500
+            - name: MEMBERSHIP_UPDATE_RATE_IN_MILLIS
+              value: "2500"
           ports:
             - name: external
               containerPort: 7777
@@ -52,10 +52,10 @@ spec:
           resources:
             limits:
               memory: "50Mi"
-              cpu: 0.02
+              cpu: "0.02"
             requests:
               memory: "50Mi"
-              cpu: 0.02
+              cpu: "0.02"
       terminationGracePeriodSeconds: 60
 
 ---
