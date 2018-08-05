@@ -2,6 +2,9 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: dui
+  labels:
+    environment: staging
+    purpose: dui
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -10,19 +13,25 @@ metadata:
   namespace: dui
   labels:
     app: dui
+    distribution: server
+    language: java
 spec:
   replicas: 3
   selector:
     matchLabels:
       app: dui
+      distribution: server
+      language: java
   template:
     metadata:
       labels:
         app: dui
+        distribution: server
+        language: java
     spec:
       containers:
         - name: master
-          image: caladreas/buming:0.3.0
+          image: caladreas/buming:0.4.0
           env:
             - name: MEMBERSHIP_UPDATE_RATE_IN_MILLIS
               value: "2500"
@@ -67,6 +76,8 @@ metadata:
 spec:
   selector:
     app: dui
+    distribution: server
+    language: java
   ports:
   - protocol: TCP
     port: 7777

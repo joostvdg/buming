@@ -7,17 +7,23 @@ metadata:
         chart: {{ include "dui.chart" . }}
         release: {{ .Release.Name }}
         heritage: {{ .Release.Service }}
+        distribution: server
+        language: java
 spec:
     replicas: {{ .Values.replicaCount }}
     selector:
         matchLabels:
             app: {{ include "dui.name" . }}
             release: {{ .Release.Name }}
+            distribution: server
+            language: java
     template:
         metadata:
             labels:
                 app: {{ include "dui.name" . }}
                 release: {{ .Release.Name }}
+                distribution: server
+                language: java
         spec:
             containers:
             - name: {{ .Chart.Name }}
