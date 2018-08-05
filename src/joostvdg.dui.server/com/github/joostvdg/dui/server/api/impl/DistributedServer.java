@@ -261,13 +261,26 @@ public class DistributedServer implements DuiServer {
                         return;
                     }
 
-                    if (feiwuMessage.getType().equals(FeiwuMessageType.MEMBERSHIP)) {
-                        Runnable runnable = () -> updateMemberShipListByMessage(feiwuMessage);
+                    logger.log(LogLevel.INFO, mainComponent, LogComponents.INTERNAL, threadId, " Received: ", feiwuMessage.toString());
+                    Runnable runnable = null;
+                    FeiwuMessageType messageType = feiwuMessage.getType();
+                    switch (messageType) {
+                        case MEMBERSHIP:
+                            runnable = () -> updateMemberShipListByMessage(feiwuMessage);
+                            break;
+                        case ELECTION_PROPOSAL:
+                            if (node.getRole().equals(NodeRole.MANAGER)) {
+                                runnable = () -> processLeaderElectionProposal(feiwuMessage);
+                            }
+                            break;
+                        default:
+                            logger.log(LogLevel.INFO, mainComponent, LogComponents.INTERNAL, threadId, " MessageType: ", messageType.toString(), ", currently not supported and discarded");
+                    }
+                    if (runnable != null) {
                         messageHandlerExecutor.submit(runnable);
-                        logger.log(LogLevel.INFO, mainComponent, LogComponents.INTERNAL, threadId, " Received: ", feiwuMessage.toString());
+                        recentProcessedMessages.put(feiwuMessage.getDigest(), System.currentTimeMillis());
                     }
 
-                    recentProcessedMessages.put(feiwuMessage.getDigest(), System.currentTimeMillis());
                     if (recentProcessedMessages.size() <= maxRecentDigest) {
                         removeOldestRecentDigest();
                     }
@@ -282,6 +295,34 @@ public class DistributedServer implements DuiServer {
             logger.log(LogLevel.WARN, mainComponent, LogComponents.INTERNAL, threadId, " Reason for stopping:", socketException.getCause().toString());
         } catch (IOException e) {
             logger.log(LogLevel.ERROR, mainComponent, LogComponents.INTERNAL, threadId, " Connection broken:", e.getCause().toString());
+        }
+    }
+
+    private void processLeaderElectionProposal(FeiwuMessage feiwuMessage) {
+        // TODO: implement this
+        final long threadId = Thread.currentThread().getId();
+
+        /* if we're not in candidate mode:
+        *   - send election acknowledgement
+        *   - set ourselves in FOLLOWER mode
+        *   - above should be atomic!
+        *   - reset our timer
+        *   TODO: should we wait for an acknowledgement on our ACK? ACK - ACK double ack?
+        *   TODO: we should keep track of the node that is our leader!
+        */
+        MessageOrigin messageOrigin = feiwuMessage.getMessageOrigin();
+
+        switch (node.getStatus()) {
+            case FOLLOWER:
+            case NONE:
+            case LEADER:
+                logger.log(LogLevel.INFO, mainComponent, LogComponents.LEADER_ELECTION, threadId, " Acknowledging leader: ", messageOrigin.getName());
+                // final FeiwuMessageType type, final String message, final MessageOrigin messageOrigin, final byte[] digest
+                FeiwuMessage acknowledgement = new FeiwuMessage(FeiwuMessageType.ELECTION_ACKNOWLEDGE, )
+                sendMessageToMember(messageOrigin.getHost(), acknowledgement);
+                break;
+            case CANDIDATE:
+                logger.log(LogLevel.WARN, mainComponent, LogComponents.LEADER_ELECTION, threadId, " I'm a candidate myself, ignoring leader proposal by: ", messageOrigin.getName());
         }
     }
 

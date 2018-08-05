@@ -11,7 +11,7 @@ public class Node {
     private long uptime;
 
     private LeaderElectionStatus status;
-    private byte role;
+    private NodeRole role;
 
     public Node(String name, String hostName, String hostIp) {
         this.name = name;
@@ -48,17 +48,16 @@ public class Node {
         this.uptime = rb.getUptime();
     }
 
-    public byte getRole() {
+    public NodeRole getRole() {
         return role;
     }
 
-    public void setRole(byte role) {
+    public void setRole(NodeRole role) {
         this.role = role;
     }
 
     @Override
     public String toString() {
-        var roleRepresentation = role == 0x00 ? "Manager" : "Worker";
 
         return "Node{" +
             "name='" + name + '\'' +
@@ -66,7 +65,7 @@ public class Node {
             ", hostIp='" + hostIp + '\'' +
             ", uptime=" + uptime +
             ", status=" + status +
-            ", role=" + roleRepresentation +
+            ", role=" + role +
             '}';
     }
 }
